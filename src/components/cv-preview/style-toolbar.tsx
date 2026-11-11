@@ -1,11 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import type { StyleConfig, PaperSize, ColorMode, FontFamily, Spacing } from "@/lib/templates";
 
 interface StyleToolbarProps {
   style: StyleConfig;
   onChange: (updated: StyleConfig) => void;
+  onExportDocx?: () => void;
+  isExportingDocx?: boolean;
 }
 
 const ACCENT_COLORS = [
@@ -16,7 +18,12 @@ const ACCENT_COLORS = [
   { name: "Teal", value: "#0f766e" },
 ];
 
-export function StyleToolbar({ style, onChange }: StyleToolbarProps) {
+export function StyleToolbar({
+  style,
+  onChange,
+  onExportDocx,
+  isExportingDocx = false,
+}: StyleToolbarProps) {
   const update = (patch: Partial<StyleConfig>) => {
     onChange({ ...style, ...patch });
   };
@@ -29,19 +36,35 @@ export function StyleToolbar({ style, onChange }: StyleToolbarProps) {
 
   return (
     <div className="no-print bg-white border border-neutral-200 rounded-lg p-3 sm:p-4 mb-4 shadow-sm space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-neutral-800">Style & Layout Options</h2>
-        <button
-          type="button"
-          onClick={handlePrint}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
-          title="Print or Save as PDF via browser print"
-        >
-          <span>🖨️</span>
-          <span>Print / Save PDF</span>
-        </button>
+      {/* Top Header & Export Actions */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-neutral-800">Layout & Export</h2>
+        <div className="flex items-center gap-2">
+          {onExportDocx && (
+            <button
+              type="button"
+              onClick={onExportDocx}
+              disabled={isExportingDocx}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-800 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 rounded-md shadow-sm transition-colors disabled:opacity-50"
+              title="Download Microsoft Word document (.docx)"
+            >
+              <span>📄</span>
+              <span>{isExportingDocx ? "Generating..." : "Export Word (.docx)"}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
+            title="Print or Save as PDF via browser print"
+          >
+            <span>🖨️</span>
+            <span>Export PDF</span>
+          </button>
+        </div>
       </div>
 
+      {/* Style Controls Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-neutral-100 text-xs">
         {/* Paper Size */}
         <div>

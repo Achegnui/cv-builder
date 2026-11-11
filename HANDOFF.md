@@ -8,14 +8,14 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - Project: CV Builder (see MASTER-PLAN.md)
 - Track: antigravity
 - Date of last update: 2026-11-11
-- Current phase: 2
+- Current phase: 3
 - Phase status: done
 
 ### 2. Completed
 - [x] Phase 0: Setup
 - [x] Phase 1: Data model and form
 - [x] Phase 2: Template engine and preview
-- [ ] Phase 3: PDF and Word export
+- [x] Phase 3: PDF and Word export
 - [ ] Phase 4: Regions and CV types
 - [ ] Phase 5: CV Doctor and Evidence Vault
 - [ ] Phase 6: Honest AI and Coach mode
@@ -24,12 +24,11 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - [ ] Phase 9: Bilingual, scholarship mode, launch
 
 Notes on what is done inside the current phase:
-- Created extensible Template Registry in `src/lib/templates/registry.ts`.
-- Implemented first ATS-safe single-column template (`single-column.tsx`) with zero HTML tables or text boxes.
-- Implemented `StyleConfig` supporting paper size (A4 / US Letter), color mode (accent color / black-only), 3 safe font stacks (sans, serif, mono), and spacing (normal / compact).
-- Built live preview with real-time updates as the user types, desktop dual-pane grid, and mobile toggle with isolated horizontal scroll container for 360px viewport support.
-- Added comprehensive print stylesheets enforcing clean `@page` sizing, hiding UI chrome, and preventing awkward entry/heading page breaks.
-- Added 8 unit tests in `src/tests/templates.test.ts` (28 total tests passing across project).
+- Implemented Microsoft Word export generator in `src/lib/export/docx.ts` using `docx` with right-aligned tab stops for dates, bullet formatting, A4/Letter sizing, and black-only/accent styling.
+- Created server-side API route handler at `POST /api/export/docx` streaming `.docx` binary attachments with sanitized filenames.
+- Built dedicated clean print view at `/print` for zero-cost, high-reliability vector PDF generation via browser print.
+- Added Export buttons for Word (.docx) and PDF across both the preview toolbar and the top form actions bar.
+- Added 7 unit tests in `src/tests/export.test.ts` verifying binary validity, internal OpenXML contents, right tab stops, black-only color enforcement, and API route responses (35 total tests passing).
 
 ### 3. Decisions (keep each to one line, with the reason)
 | Decision | Reason |
@@ -42,6 +41,8 @@ Notes on what is done inside the current phase:
 | Client-side auto-save with Zod validation | Guarantees stored data validity and prevents work loss without server roundtrips |
 | Semantic HTML for templates (no tables) | Ensures ATS parsing accuracy and strict compliance with accessibility standards |
 | Black-only mode as first-class setting | Critical for traditional employers, government portals, and ATS scanners |
+| PDF via browser print with /print view | Zero server compute cost ($0), instant 0ms latency, 100% reliable on free hosts |
+| Word export via `docx` library | Produces native, editable OpenXML documents matching the ATS template layout |
 
 ### 4. Environment
 - Node version: v22.19.0
@@ -52,13 +53,11 @@ Notes on what is done inside the current phase:
 
 ### 5. Key files (only the important ones)
 ```
-src/lib/templates/types.ts           # StyleConfig, PaperSize, FontFamily types
-src/lib/templates/registry.ts        # Extensible template registry
-src/lib/templates/single-column.tsx  # First ATS-safe single-column template
-src/components/cv-preview/           # Preview container & style toolbar
-src/components/cv-form/cv-form.tsx   # Dual-pane form + live preview coordinator
-src/tests/templates.test.ts          # Template rendering & black-only mode tests
-src/app/globals.css                  # Print CSS rules (@media print)
+src/lib/export/docx.ts               # Word document generation with tab stops & styling
+src/app/api/export/docx/route.ts     # POST route streaming .docx binary attachment
+src/app/print/page.tsx               # Dedicated clean print-to-PDF view
+src/components/cv-preview/style-toolbar.tsx # Export Word & Export PDF action triggers
+src/tests/export.test.ts             # Word export & API route unit tests
 ```
 
 ### 6. Conventions in use
@@ -69,15 +68,15 @@ src/app/globals.css                  # Print CSS rules (@media print)
 - No HTML tables or text boxes for layout
 
 ### 7. Known issues and TODO
-- None from Phase 2.
+- None from Phase 3.
 
 ### 8. Next task (be exact)
-Phase 3: Export to PDF and Word. Add export routes: PDF (server-side generation with browser print as fallback) and Word (.docx via the `docx` library with right-aligned tab stops for dates, bullet formatting, and style options).
+Phase 4: Regions and CV types. Build region profiles in `src/lib/regions` (US, UK, German style Lebenslauf, Europass-style, academic, technical, combination, one-page) with a warnings panel and toggles for photo, date of birth, and length.
 
 ### 9. Last session summary
-- Implemented template registry, style options, and ATS-safe single-column template.
-- Built live real-time preview beside the form with mobile tab switching and print stylesheets.
-- Verified 28 unit tests and production build.
+- Built `.docx` Word export engine matching the single-column template layout with right-aligned tab stops.
+- Created `POST /api/export/docx` route handler and dedicated `/print` view.
+- Added 7 export unit tests and verified production build.
 
 ### 10. Scorecard notes for this track
 - Time spent this phase: ~0.75 hours

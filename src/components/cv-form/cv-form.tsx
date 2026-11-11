@@ -34,6 +34,7 @@ export function CVForm() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
   const [style, setStyle] = useState<StyleConfig>(DEFAULT_STYLE_CONFIG);
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{
     text: string;
     type: "info" | "success" | "error";
@@ -161,6 +162,48 @@ export function CVForm() {
     }
   };
 
+  // Handler: Export Microsoft Word document (.docx)
+  const handleExportDocx = async () => {
+    try {
+      setIsExportingDocx(true);
+      const response = await fetch("/api/export/docx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: liveCVData, style }),
+      });
+
+      if (!response.ok) {
+        const errorJson = await response.json().catch(() => null);
+        throw new Error(errorJson?.message || "Failed to generate Word document");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const safeName = (liveCVData.profile.fullName || "CV")
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]/g, "_");
+      a.download = `${safeName}_CV.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setFeedbackMessage({
+        text: "Downloaded Microsoft Word document (.docx).",
+        type: "success",
+      });
+    } catch (err: unknown) {
+      setFeedbackMessage({
+        text: err instanceof Error ? err.message : "Failed to export Word document",
+        type: "error",
+      });
+    } finally {
+      setIsExportingDocx(false);
+    }
+  };
+
   if (!isLoaded) {
     return (
       <div className="flex items-center justify-center p-12 text-neutral-500">
@@ -251,6 +294,21 @@ export function CVForm() {
               >
                 Export JSON
               </button>
+              <button
+                type="button"
+                onClick={handleExportDocx}
+                disabled={isExportingDocx}
+                className="px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-800 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 rounded-md transition-colors disabled:opacity-50"
+              >
+                {isExportingDocx ? "Generating Word..." : "Export Word"}
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+              >
+                Export PDF
+              </button>
               <label className="px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors cursor-pointer">
                 Import JSON
                 <input
@@ -326,7 +384,12 @@ export function CVForm() {
             activeTab === "edit" ? "hidden lg:block" : "block"
           }`}
         >
-          <StyleToolbar style={style} onChange={handleStyleChange} />
+          <StyleToolbar
+            style={style}
+            onChange={handleStyleChange}
+            onExportDocx={handleExportDocx}
+            isExportingDocx={isExportingDocx}
+          />
           <div className="print-only-container">
             <CVPreview data={liveCVData} style={style} />
           </div>
