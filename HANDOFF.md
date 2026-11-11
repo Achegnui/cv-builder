@@ -2,53 +2,17 @@
 
 This file is the memory of the project. Any new chat (or agent) reads it and continues exactly where the last one stopped. Keep it short, under about 150 lines, so it costs little context.
 
-**Rule:** at the end of every task, and before leaving a chat, ask the AI to output an updated version of this file. Paste it over the old one in your project folder.
-
-Keep one copy per track: one in `cv-builder-antigravity/` and one in `cv-builder-claude/`.
-
 ---
-
-## When to switch to a new chat
-
-Switch at a natural break (finished a file or task), not in the middle of one. Signs that the chat is getting too full:
-- The chat is very long and replies are slower or get cut off
-- The AI forgets earlier decisions or repeats a mistake you already fixed
-- It starts rewriting files you did not ask about
-- You hit the daily limit on the free tier
-- You finished a phase (always start a fresh chat for the next phase)
-
-**Switching procedure (about two minutes):**
-1. In the old chat, paste the **Update prompt** below.
-2. Save the returned file as `HANDOFF.md` in your project folder (replace the old one).
-3. Open a new chat. Attach `AGENTS.md`, `HANDOFF.md`, `MASTER-PLAN.md`.
-4. Paste the **Resume prompt** below.
-5. Check the AI's 5-line summary. If it is wrong, correct it before any coding.
-
-### Update prompt (paste in the old chat)
-> Stop coding. Output a complete, updated HANDOFF.md using the template structure. Include what we finished, decisions with reasons, the current file tree (key files only), known issues, and the exact next task. Do not include secrets or long code. Keep it under 150 lines.
-
-### Resume prompt (paste in the new chat)
-> I attached AGENTS.md, HANDOFF.md and MASTER-PLAN.md. Read them. Before writing any code, summarize in 5 lines: the project, the current phase, what is done, the decisions that matter, and the next task. Wait for my confirmation, then continue with the next task. Give files one at a time with full paths, and explain simply.
-
-### Saving tokens on the free tier
-- Ask for one file or one change per message.
-- Ask for "only the changed parts with a few lines of context" when editing existing files.
-- Paste only the relevant file or error message, not the whole project.
-- Do not paste long logs. Paste the first error and the lines around it.
-
----
-
-## TEMPLATE (copy from here, fill in, keep updated)
 
 ### 1. Snapshot
 - Project: CV Builder (see MASTER-PLAN.md)
-- Track: [antigravity | claude]
-- Date of last update: [YYYY-MM-DD]
-- Current phase: [0 to 9]
-- Phase status: [not started | in progress | blocked | done]
+- Track: antigravity
+- Date of last update: 2026-11-10
+- Current phase: 0
+- Phase status: done
 
 ### 2. Completed
-- [ ] Phase 0: Setup
+- [x] Phase 0: Setup
 - [ ] Phase 1: Data model and form
 - [ ] Phase 2: Template engine and preview
 - [ ] Phase 3: PDF and Word export
@@ -60,48 +24,65 @@ Switch at a natural break (finished a file or task), not in the middle of one. S
 - [ ] Phase 9: Bilingual, scholarship mode, launch
 
 Notes on what is done inside the current phase:
-- [short list]
+- Initialized Next.js App Router app with TypeScript strict mode and Tailwind CSS.
+- Installed Zod, React Hook Form, and Vitest testing suite.
+- Verified test suite (`npm run test`) and production build (`npm run build`).
+- Created folder structure from section 4 of MASTER-PLAN.md with placeholder files.
+- Added `.env.example`, `.agents/rules/project-rules.md`, and clean home page displaying "CV Builder".
 
 ### 3. Decisions (keep each to one line, with the reason)
 | Decision | Reason |
 |---|---|
-| PDF method: [server render | browser print] | [reason] |
-| Database/auth: [Supabase | Appwrite | Firebase] | [reason] |
-| Payments: [Flutterwave | PayUnit | Campay | other] | [reason] |
-| Fonts and theme defaults | [reason] |
-| Anything else that would be painful to rediscover | [reason] |
+| Next.js App Router + TS strict mode | Required stack, modern standard for server routes and metadata |
+| Vitest with path aliases | Fast unit testing for logic with native ESM and `@/*` mapping |
+| Root outputFileTracingRoot in next.config | Prevents Next.js from falsely inferring user parent directory as workspace root |
+| Tailwind CSS v3 | Stable utility styling for responsive mobile-first layouts |
 
 ### 4. Environment
-- Node version: [x]
-- Package manager: [npm | pnpm]
-- Scripts: `npm run dev`, `npm run test`, `npm run build`
-- Environment variable NAMES used (no values): [list]
-- Hosting target: [x]
+- Node version: v22.19.0
+- Package manager: npm (10.8.2)
+- Scripts: `npm run dev`, `npm run test`, `npm run build`, `npm run lint`
+- Environment variable NAMES used (no values): `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `FLUTTERWAVE_PUBLIC_KEY`, `FLUTTERWAVE_SECRET_KEY`, `FLUTTERWAVE_ENCRYPTION_KEY`, `FLUTTERWAVE_WEBHOOK_SECRET_HASH`
+- Hosting target: TBD (Phase 9)
 
 ### 5. Key files (only the important ones)
 ```
-src/lib/schema/...
-src/lib/templates/...
-src/lib/regions/...
-(update as the project grows)
+src/app/page.tsx
+src/app/layout.tsx
+src/app/globals.css
+src/tests/sample.test.ts
+src/lib/schema/index.ts
+src/lib/templates/index.ts
+src/lib/regions/index.ts
+src/lib/validation/index.ts
+src/lib/vault/index.ts
+src/lib/ai/index.ts
+src/lib/export/index.ts
+src/lib/i18n/index.ts
+.env.example
+vitest.config.ts
+tailwind.config.ts
+next.config.ts
 ```
 
 ### 6. Conventions in use
 - Follows AGENTS.md
-- Extra project-specific conventions: [short list]
+- Strict TypeScript (`noImplicitAny`, strict null checks)
+- Dates stored as `YYYY-MM` strings
 
 ### 7. Known issues and TODO
-- [ ] [issue, where, what was tried]
-- [ ] [TODO]
+- None for Phase 0.
 
 ### 8. Next task (be exact)
-[One clear task. Example: "Phase 3: write the docx export route in src/app/api/export/docx/route.ts using the style config, then test that the file contains the summary text."]
+Phase 1: Implement the CV data model from section 3 of cv-builder-project-brief.md as Zod schemas and TypeScript types in `src/lib/schema`, and build the multi-section form with browser storage persistence.
 
 ### 9. Last session summary
-- [3 to 5 lines: what changed, what broke, what was learned]
+- Scaffolded Next.js project with TypeScript, Tailwind CSS, Zod, React Hook Form, and Vitest.
+- Set up project structure, placeholders, and `.env.example`.
+- Verified tests and production build pass cleanly.
 
 ### 10. Scorecard notes for this track
-- Time spent this phase: [x hours]
-- Number of fix prompts needed: [x]
-- Manual steps I had to do myself: [x]
-- Surprises: [short]
+- Time spent this phase: ~0.5 hours
+- Number of fix prompts needed: 0
+- Manual steps I had to do myself: 1 (initial git branch setup)
+- Surprises: Parent directory had untracked user files needing explicit root boundary.
