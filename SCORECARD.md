@@ -6,7 +6,7 @@ Track B: Claude
 | Phase | Time Spent | Fix Prompts | Manual Steps | Surprises / Notes |
 |---|---|---|---|---|
 | Phase 0: Setup | ~0.5h | 0 | 1 | Parent user directory had a Git repo; fixed root tracing |
-| Phase 1: Data model and form | | | | |
+| Phase 1: Data model and form | ~1.0h | 0 | 0 | Nested useFieldArray paths required explicit casting |
 | Phase 2: Template engine and preview | | | | |
 | Phase 3: PDF and Word export | | | | |
 | Phase 4: Regions and CV types | | | | |

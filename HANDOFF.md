@@ -7,13 +7,13 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 ### 1. Snapshot
 - Project: CV Builder (see MASTER-PLAN.md)
 - Track: antigravity
-- Date of last update: 2026-11-10
-- Current phase: 0
+- Date of last update: 2026-11-11
+- Current phase: 1
 - Phase status: done
 
 ### 2. Completed
 - [x] Phase 0: Setup
-- [ ] Phase 1: Data model and form
+- [x] Phase 1: Data model and form
 - [ ] Phase 2: Template engine and preview
 - [ ] Phase 3: PDF and Word export
 - [ ] Phase 4: Regions and CV types
@@ -24,11 +24,13 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - [ ] Phase 9: Bilingual, scholarship mode, launch
 
 Notes on what is done inside the current phase:
-- Initialized Next.js App Router app with TypeScript strict mode and Tailwind CSS.
-- Installed Zod, React Hook Form, and Vitest testing suite.
-- Verified test suite (`npm run test`) and production build (`npm run build`).
-- Created folder structure from section 4 of MASTER-PLAN.md with placeholder files.
-- Added `.env.example`, `.agents/rules/project-rules.md`, and clean home page displaying "CV Builder".
+- Defined structured Zod schemas and TypeScript types in `src/lib/schema/` with YYYY-MM date enforcement.
+- Kept GPA and degree classification as strictly separate fields.
+- Implemented multi-section form with React Hook Form covering profile, summary, experience, education, skills, projects, certifications, awards, languages, and 4 academic sections.
+- Enabled adding, removing, and reordering entries with up/down controls.
+- Implemented auto-save to browser `localStorage` that persists across reloads, plus JSON import and export backups.
+- Added fictional sample CV data for testing and demonstrations.
+- Added 20 unit tests across schemas, storage, and JSON I/O (all passing).
 
 ### 3. Decisions (keep each to one line, with the reason)
 | Decision | Reason |
@@ -36,7 +38,9 @@ Notes on what is done inside the current phase:
 | Next.js App Router + TS strict mode | Required stack, modern standard for server routes and metadata |
 | Vitest with path aliases | Fast unit testing for logic with native ESM and `@/*` mapping |
 | Root outputFileTracingRoot in next.config | Prevents Next.js from falsely inferring user parent directory as workspace root |
-| Tailwind CSS v3 | Stable utility styling for responsive mobile-first layouts |
+| Dates as YYYY-MM regex strings | Standardized, sortable, prevents timezone shifts across regions |
+| GPA & degree classification separated | Prevents mixing US 4.0 GPA with UK honours classifications |
+| Client-side auto-save with Zod validation | Guarantees stored data validity and prevents work loss without server roundtrips |
 
 ### 4. Environment
 - Node version: v22.19.0
@@ -47,42 +51,38 @@ Notes on what is done inside the current phase:
 
 ### 5. Key files (only the important ones)
 ```
-src/app/page.tsx
-src/app/layout.tsx
-src/app/globals.css
-src/tests/sample.test.ts
-src/lib/schema/index.ts
-src/lib/templates/index.ts
-src/lib/regions/index.ts
-src/lib/validation/index.ts
-src/lib/vault/index.ts
-src/lib/ai/index.ts
-src/lib/export/index.ts
-src/lib/i18n/index.ts
-.env.example
-vitest.config.ts
-tailwind.config.ts
-next.config.ts
+src/lib/schema/cv.ts                # Zod schemas & types for all CV sections
+src/lib/schema/sample-data.ts        # Fictional sample CV data
+src/lib/schema/defaults.ts           # Empty initial CV state
+src/lib/storage.ts                   # localStorage save/load/clear with Zod check
+src/lib/json-io.ts                   # JSON backup export and import
+src/components/cv-form/cv-form.tsx   # Top-level multi-section form manager
+src/components/cv-form/              # Section subcomponents (profile, exp, edu, etc.)
+src/tests/schema.test.ts             # Schema validation unit tests
+src/tests/storage.test.ts            # Browser storage unit tests
+src/tests/json-io.test.ts            # JSON import/export unit tests
 ```
 
 ### 6. Conventions in use
 - Follows AGENTS.md
 - Strict TypeScript (`noImplicitAny`, strict null checks)
 - Dates stored as `YYYY-MM` strings
+- Components stay small; logic lives in `src/lib`
 
 ### 7. Known issues and TODO
-- None for Phase 0.
+- None from Phase 1.
 
 ### 8. Next task (be exact)
-Phase 1: Implement the CV data model from section 3 of cv-builder-project-brief.md as Zod schemas and TypeScript types in `src/lib/schema`, and build the multi-section form with browser storage persistence.
+Phase 2: Build the template registry in `src/lib/templates` and create the first single-column ATS-safe template with style options (A4/US Letter, black-only/accent color, safe fonts, compact/normal spacing) and live preview next to the form.
 
 ### 9. Last session summary
-- Scaffolded Next.js project with TypeScript, Tailwind CSS, Zod, React Hook Form, and Vitest.
-- Set up project structure, placeholders, and `.env.example`.
-- Verified tests and production build pass cleanly.
+- Implemented full CV data model in Zod with TypeScript types.
+- Built interactive multi-section form with add/remove/reorder and validation messages.
+- Added browser persistence and JSON backup import/export.
+- Verified test suite (20 tests passed) and production build.
 
 ### 10. Scorecard notes for this track
-- Time spent this phase: ~0.5 hours
+- Time spent this phase: ~1.0 hour
 - Number of fix prompts needed: 0
-- Manual steps I had to do myself: 1 (initial git branch setup)
-- Surprises: Parent directory had untracked user files needing explicit root boundary.
+- Manual steps I had to do myself: 0
+- Surprises: None.
