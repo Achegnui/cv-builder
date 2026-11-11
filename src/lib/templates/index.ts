@@ -1,2 +1,3 @@
-// Template registry placeholder for Phase 2: Template engine and renderers
-export {};
+export * from "./types";
+export * from "./registry";
+export * from "./single-column";

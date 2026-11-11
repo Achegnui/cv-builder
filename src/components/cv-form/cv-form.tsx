@@ -11,6 +11,7 @@ import {
 } from "@/lib/schema";
 import { saveCVToStorage, loadCVFromStorage, clearCVStorage } from "@/lib/storage";
 import { exportCVToJSON, importCVFromJSON } from "@/lib/json-io";
+import { DEFAULT_STYLE_CONFIG, type StyleConfig } from "@/lib/templates";
 
 import { ProfileSection } from "./profile-section";
 import { SummarySection } from "./summary-section";
@@ -26,8 +27,13 @@ import { GrantsSection } from "./grants-section";
 import { TeachingSection } from "./teaching-section";
 import { ConferencesSection } from "./conferences-section";
 
+import { StyleToolbar } from "@/components/cv-preview/style-toolbar";
+import { CVPreview } from "@/components/cv-preview/cv-preview";
+
 export function CVForm() {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
+  const [style, setStyle] = useState<StyleConfig>(DEFAULT_STYLE_CONFIG);
   const [feedbackMessage, setFeedbackMessage] = useState<{
     text: string;
     type: "info" | "success" | "error";
@@ -42,7 +48,10 @@ export function CVForm() {
 
   const { reset, watch, handleSubmit } = methods;
 
-  // 1. On page open: load saved CV from browser storage (if any)
+  // Watch full CV data for instant live preview updates
+  const watchedData = watch();
+
+  // 1. On page open: load saved CV & style from browser storage (if any)
   useEffect(() => {
     const saved = loadCVFromStorage();
     if (saved) {
@@ -52,6 +61,16 @@ export function CVForm() {
         type: "info",
       });
     }
+
+    try {
+      const savedStyle = localStorage.getItem("cv-builder-style");
+      if (savedStyle) {
+        setStyle(JSON.parse(savedStyle));
+      }
+    } catch {
+      // Ignore style load errors
+    }
+
     setIsLoaded(true);
   }, [reset]);
 
@@ -59,7 +78,6 @@ export function CVForm() {
   useEffect(() => {
     if (!isLoaded) return;
     const subscription = watch((value) => {
-      // Safe parse to check valid shape before persisting
       const parsed = CVDataSchema.safeParse(value);
       if (parsed.success) {
         saveCVToStorage(parsed.data);
@@ -67,6 +85,16 @@ export function CVForm() {
     });
     return () => subscription.unsubscribe();
   }, [watch, isLoaded]);
+
+  // Handle style changes and persist
+  const handleStyleChange = (updated: StyleConfig) => {
+    setStyle(updated);
+    try {
+      localStorage.setItem("cv-builder-style", JSON.stringify(updated));
+    } catch {
+      // Ignore storage errors
+    }
+  };
 
   // Handler: Load fictional sample data
   const handleLoadSample = () => {
@@ -136,99 +164,174 @@ export function CVForm() {
   if (!isLoaded) {
     return (
       <div className="flex items-center justify-center p-12 text-neutral-500">
-        Loading CV form...
+        Loading CV builder...
       </div>
     );
   }
 
+  // Ensure watchedData has full shape for rendering
+  const liveCVData: CVData = {
+    profile: {
+      fullName: watchedData?.profile?.fullName || "",
+      email: watchedData?.profile?.email || "",
+      phone: watchedData?.profile?.phone || "",
+      location: watchedData?.profile?.location || "",
+      linkedIn: watchedData?.profile?.linkedIn || "",
+      website: watchedData?.profile?.website || "",
+      photoUrl: watchedData?.profile?.photoUrl || "",
+      dateOfBirth: watchedData?.profile?.dateOfBirth || "",
+      nationality: watchedData?.profile?.nationality || "",
+    },
+    summary: {
+      text: watchedData?.summary?.text || "",
+    },
+    experience: watchedData?.experience || [],
+    education: watchedData?.education || [],
+    skillGroups: watchedData?.skillGroups || [],
+    projects: watchedData?.projects || [],
+    certifications: watchedData?.certifications || [],
+    awards: watchedData?.awards || [],
+    languages: watchedData?.languages || [],
+    publications: watchedData?.publications || [],
+    grants: watchedData?.grants || [],
+    teaching: watchedData?.teaching || [],
+    conferences: watchedData?.conferences || [],
+  };
+
   return (
     <FormProvider {...methods}>
-      <form onSubmit={handleSubmit(() => {})} className="space-y-6">
-        {/* Actions Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white border border-neutral-200 rounded-lg shadow-sm">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleLoadSample}
-              className="px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors"
-            >
-              Load Sample CV
-            </button>
-            <button
-              type="button"
-              onClick={handleExport}
-              className="px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors"
-            >
-              Export JSON Backup
-            </button>
-            <label className="px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors cursor-pointer">
-              Import JSON
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json,application/json"
-                onChange={handleImportFile}
-                className="hidden"
-              />
-            </label>
-          </div>
-          <button
-            type="button"
-            onClick={handleClear}
-            className="px-3 py-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-800 transition-colors"
-          >
-            Clear All
-          </button>
-        </div>
+      {/* Mobile Tab Switcher (< 1024px) */}
+      <div className="no-print lg:hidden mb-4 flex border border-neutral-300 rounded-lg p-1 bg-neutral-100">
+        <button
+          type="button"
+          onClick={() => setActiveTab("edit")}
+          className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${
+            activeTab === "edit"
+              ? "bg-white text-neutral-900 shadow-sm"
+              : "text-neutral-600 hover:text-neutral-900"
+          }`}
+        >
+          ✏️ Edit Form
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("preview")}
+          className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${
+            activeTab === "preview"
+              ? "bg-white text-neutral-900 shadow-sm"
+              : "text-neutral-600 hover:text-neutral-900"
+          }`}
+        >
+          👁️ Live Preview
+        </button>
+      </div>
 
-        {/* Feedback / Notification Banner */}
-        {feedbackMessage && (
-          <div
-            className={`p-3 rounded-md text-sm whitespace-pre-line flex items-center justify-between ${
-              feedbackMessage.type === "error"
-                ? "bg-red-50 text-red-800 border border-red-200"
-                : feedbackMessage.type === "success"
-                ? "bg-green-50 text-green-800 border border-green-200"
-                : "bg-blue-50 text-blue-800 border border-blue-200"
-            }`}
-          >
-            <span>{feedbackMessage.text}</span>
-            <button
-              type="button"
-              onClick={() => setFeedbackMessage(null)}
-              className="ml-3 text-xs font-semibold opacity-70 hover:opacity-100"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {/* Form Sections */}
-        <div className="space-y-4">
-          <ProfileSection />
-          <SummarySection />
-          <ExperienceSection />
-          <EducationSection />
-          <SkillsSection />
-          <ProjectsSection />
-          <CertificationsSection />
-          <AwardsSection />
-          <LanguagesSection />
-
-          {/* Academic Sections Header */}
-          <div className="pt-4 border-t border-neutral-200">
-            <h3 className="text-sm font-semibold tracking-wider text-neutral-500 uppercase mb-3">
-              Academic & Scholarship Sections (Optional)
-            </h3>
-            <div className="space-y-4">
-              <PublicationsSection />
-              <GrantsSection />
-              <TeachingSection />
-              <ConferencesSection />
+      {/* Main Grid: Single-column on mobile, Side-by-side on desktop */}
+      <div className="lg:grid lg:grid-cols-12 lg:gap-8 items-start">
+        {/* Left Column: Form Controls (hidden on mobile if activeTab === 'preview') */}
+        <div
+          className={`lg:col-span-6 space-y-6 ${
+            activeTab === "preview" ? "hidden lg:block" : "block"
+          }`}
+        >
+          {/* Actions Bar */}
+          <div className="no-print flex flex-wrap items-center justify-between gap-3 p-4 bg-white border border-neutral-200 rounded-lg shadow-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleLoadSample}
+                className="px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors"
+              >
+                Load Sample CV
+              </button>
+              <button
+                type="button"
+                onClick={handleExport}
+                className="px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors"
+              >
+                Export JSON
+              </button>
+              <label className="px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors cursor-pointer">
+                Import JSON
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleImportFile}
+                  className="hidden"
+                />
+              </label>
             </div>
+            <button
+              type="button"
+              onClick={handleClear}
+              className="px-3 py-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-800 transition-colors"
+            >
+              Clear All
+            </button>
+          </div>
+
+          {/* Feedback / Notification Banner */}
+          {feedbackMessage && (
+            <div
+              className={`no-print p-3 rounded-md text-sm whitespace-pre-line flex items-center justify-between ${
+                feedbackMessage.type === "error"
+                  ? "bg-red-50 text-red-800 border border-red-200"
+                  : feedbackMessage.type === "success"
+                  ? "bg-green-50 text-green-800 border border-green-200"
+                  : "bg-blue-50 text-blue-800 border border-blue-200"
+              }`}
+            >
+              <span>{feedbackMessage.text}</span>
+              <button
+                type="button"
+                onClick={() => setFeedbackMessage(null)}
+                className="ml-3 text-xs font-semibold opacity-70 hover:opacity-100"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Form Sections */}
+          <form onSubmit={handleSubmit(() => {})} className="space-y-4">
+            <ProfileSection />
+            <SummarySection />
+            <ExperienceSection />
+            <EducationSection />
+            <SkillsSection />
+            <ProjectsSection />
+            <CertificationsSection />
+            <AwardsSection />
+            <LanguagesSection />
+
+            {/* Academic Sections Header */}
+            <div className="pt-4 border-t border-neutral-200">
+              <h3 className="text-sm font-semibold tracking-wider text-neutral-500 uppercase mb-3">
+                Academic & Scholarship Sections (Optional)
+              </h3>
+              <div className="space-y-4">
+                <PublicationsSection />
+                <GrantsSection />
+                <TeachingSection />
+                <ConferencesSection />
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* Right Column: Live Preview & Style Toolbar (hidden on mobile if activeTab === 'edit') */}
+        <div
+          className={`lg:col-span-6 lg:sticky lg:top-6 space-y-4 ${
+            activeTab === "edit" ? "hidden lg:block" : "block"
+          }`}
+        >
+          <StyleToolbar style={style} onChange={handleStyleChange} />
+          <div className="print-only-container">
+            <CVPreview data={liveCVData} style={style} />
           </div>
         </div>
-      </form>
+      </div>
     </FormProvider>
   );
 }

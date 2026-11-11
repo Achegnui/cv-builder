@@ -8,13 +8,13 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - Project: CV Builder (see MASTER-PLAN.md)
 - Track: antigravity
 - Date of last update: 2026-11-11
-- Current phase: 1
+- Current phase: 2
 - Phase status: done
 
 ### 2. Completed
 - [x] Phase 0: Setup
 - [x] Phase 1: Data model and form
-- [ ] Phase 2: Template engine and preview
+- [x] Phase 2: Template engine and preview
 - [ ] Phase 3: PDF and Word export
 - [ ] Phase 4: Regions and CV types
 - [ ] Phase 5: CV Doctor and Evidence Vault
@@ -24,13 +24,12 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - [ ] Phase 9: Bilingual, scholarship mode, launch
 
 Notes on what is done inside the current phase:
-- Defined structured Zod schemas and TypeScript types in `src/lib/schema/` with YYYY-MM date enforcement.
-- Kept GPA and degree classification as strictly separate fields.
-- Implemented multi-section form with React Hook Form covering profile, summary, experience, education, skills, projects, certifications, awards, languages, and 4 academic sections.
-- Enabled adding, removing, and reordering entries with up/down controls.
-- Implemented auto-save to browser `localStorage` that persists across reloads, plus JSON import and export backups.
-- Added fictional sample CV data for testing and demonstrations.
-- Added 20 unit tests across schemas, storage, and JSON I/O (all passing).
+- Created extensible Template Registry in `src/lib/templates/registry.ts`.
+- Implemented first ATS-safe single-column template (`single-column.tsx`) with zero HTML tables or text boxes.
+- Implemented `StyleConfig` supporting paper size (A4 / US Letter), color mode (accent color / black-only), 3 safe font stacks (sans, serif, mono), and spacing (normal / compact).
+- Built live preview with real-time updates as the user types, desktop dual-pane grid, and mobile toggle with isolated horizontal scroll container for 360px viewport support.
+- Added comprehensive print stylesheets enforcing clean `@page` sizing, hiding UI chrome, and preventing awkward entry/heading page breaks.
+- Added 8 unit tests in `src/tests/templates.test.ts` (28 total tests passing across project).
 
 ### 3. Decisions (keep each to one line, with the reason)
 | Decision | Reason |
@@ -41,6 +40,8 @@ Notes on what is done inside the current phase:
 | Dates as YYYY-MM regex strings | Standardized, sortable, prevents timezone shifts across regions |
 | GPA & degree classification separated | Prevents mixing US 4.0 GPA with UK honours classifications |
 | Client-side auto-save with Zod validation | Guarantees stored data validity and prevents work loss without server roundtrips |
+| Semantic HTML for templates (no tables) | Ensures ATS parsing accuracy and strict compliance with accessibility standards |
+| Black-only mode as first-class setting | Critical for traditional employers, government portals, and ATS scanners |
 
 ### 4. Environment
 - Node version: v22.19.0
@@ -51,16 +52,13 @@ Notes on what is done inside the current phase:
 
 ### 5. Key files (only the important ones)
 ```
-src/lib/schema/cv.ts                # Zod schemas & types for all CV sections
-src/lib/schema/sample-data.ts        # Fictional sample CV data
-src/lib/schema/defaults.ts           # Empty initial CV state
-src/lib/storage.ts                   # localStorage save/load/clear with Zod check
-src/lib/json-io.ts                   # JSON backup export and import
-src/components/cv-form/cv-form.tsx   # Top-level multi-section form manager
-src/components/cv-form/              # Section subcomponents (profile, exp, edu, etc.)
-src/tests/schema.test.ts             # Schema validation unit tests
-src/tests/storage.test.ts            # Browser storage unit tests
-src/tests/json-io.test.ts            # JSON import/export unit tests
+src/lib/templates/types.ts           # StyleConfig, PaperSize, FontFamily types
+src/lib/templates/registry.ts        # Extensible template registry
+src/lib/templates/single-column.tsx  # First ATS-safe single-column template
+src/components/cv-preview/           # Preview container & style toolbar
+src/components/cv-form/cv-form.tsx   # Dual-pane form + live preview coordinator
+src/tests/templates.test.ts          # Template rendering & black-only mode tests
+src/app/globals.css                  # Print CSS rules (@media print)
 ```
 
 ### 6. Conventions in use
@@ -68,21 +66,21 @@ src/tests/json-io.test.ts            # JSON import/export unit tests
 - Strict TypeScript (`noImplicitAny`, strict null checks)
 - Dates stored as `YYYY-MM` strings
 - Components stay small; logic lives in `src/lib`
+- No HTML tables or text boxes for layout
 
 ### 7. Known issues and TODO
-- None from Phase 1.
+- None from Phase 2.
 
 ### 8. Next task (be exact)
-Phase 2: Build the template registry in `src/lib/templates` and create the first single-column ATS-safe template with style options (A4/US Letter, black-only/accent color, safe fonts, compact/normal spacing) and live preview next to the form.
+Phase 3: Export to PDF and Word. Add export routes: PDF (server-side generation with browser print as fallback) and Word (.docx via the `docx` library with right-aligned tab stops for dates, bullet formatting, and style options).
 
 ### 9. Last session summary
-- Implemented full CV data model in Zod with TypeScript types.
-- Built interactive multi-section form with add/remove/reorder and validation messages.
-- Added browser persistence and JSON backup import/export.
-- Verified test suite (20 tests passed) and production build.
+- Implemented template registry, style options, and ATS-safe single-column template.
+- Built live real-time preview beside the form with mobile tab switching and print stylesheets.
+- Verified 28 unit tests and production build.
 
 ### 10. Scorecard notes for this track
-- Time spent this phase: ~1.0 hour
+- Time spent this phase: ~0.75 hours
 - Number of fix prompts needed: 0
 - Manual steps I had to do myself: 0
 - Surprises: None.

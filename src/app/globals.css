@@ -13,3 +13,55 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   min-height: 100vh;
 }
+
+/* ------------------------------------------------------------- */
+/* Print CSS: Enforce exact, clean paper output                   */
+/* ------------------------------------------------------------- */
+@media print {
+  /* Hide all non-CV UI elements */
+  header,
+  nav,
+  aside,
+  form,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  main {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  .print-only-container {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Page setup */
+  @page {
+    margin: 12mm 15mm;
+  }
+
+  /* Sensible page breaking */
+  h1, h2, h3, h4 {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .break-inside-avoid,
+  li {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
