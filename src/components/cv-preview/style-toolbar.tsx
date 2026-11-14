@@ -8,6 +8,8 @@ interface StyleToolbarProps {
   onChange: (updated: StyleConfig) => void;
   onExportDocx?: () => void;
   isExportingDocx?: boolean;
+  isExportBlocked?: boolean;
+  blockingReason?: string;
 }
 
 const ACCENT_COLORS = [
@@ -23,12 +25,18 @@ export function StyleToolbar({
   onChange,
   onExportDocx,
   isExportingDocx = false,
+  isExportBlocked = false,
+  blockingReason,
 }: StyleToolbarProps) {
   const update = (patch: Partial<StyleConfig>) => {
     onChange({ ...style, ...patch });
   };
 
   const handlePrint = () => {
+    if (isExportBlocked) {
+      alert("Export is blocked: " + (blockingReason || "Please resolve unfinished placeholders."));
+      return;
+    }
     if (typeof window !== "undefined") {
       window.print();
     }
@@ -44,9 +52,13 @@ export function StyleToolbar({
             <button
               type="button"
               onClick={onExportDocx}
-              disabled={isExportingDocx}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-800 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 rounded-md shadow-sm transition-colors disabled:opacity-50"
-              title="Download Microsoft Word document (.docx)"
+              disabled={isExportingDocx || isExportBlocked}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-800 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 rounded-md shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title={
+                isExportBlocked
+                  ? blockingReason || "Export is blocked while unfinished placeholders remain."
+                  : "Download Microsoft Word document (.docx)"
+              }
             >
               <span>📄</span>
               <span>{isExportingDocx ? "Generating..." : "Export Word (.docx)"}</span>
@@ -55,8 +67,13 @@ export function StyleToolbar({
           <button
             type="button"
             onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
-            title="Print or Save as PDF via browser print"
+            disabled={isExportBlocked}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title={
+              isExportBlocked
+                ? blockingReason || "Export is blocked while unfinished placeholders remain."
+                : "Print or Save as PDF via browser print"
+            }
           >
             <span>🖨️</span>
             <span>Export PDF</span>

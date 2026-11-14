@@ -4,6 +4,7 @@ import { CVDataSchema } from "@/lib/schema";
 import { generateDocx } from "@/lib/export/docx";
 import { DEFAULT_STYLE_CONFIG, type StyleConfig } from "@/lib/templates";
 import { getRegionProfile, type RegionProfileId, type UserRegionOverrides } from "@/lib/regions";
+import { runCVDoctor, getBlockingIssues } from "@/lib/validation";
 
 const StyleConfigSchema = z.object({
   paperSize: z.enum(["a4", "letter"]).default("a4"),
@@ -58,6 +59,21 @@ export async function POST(request: Request) {
 
     const { data, style, regionProfileId, userOverrides } = parseResult.data;
     const regionProfile = getRegionProfile(regionProfileId as RegionProfileId);
+
+    // Rule 3: Placeholders block export. Unfinished placeholders must be resolved.
+    const validationIssues = runCVDoctor(data, { vault: [] });
+    const blockingIssues = getBlockingIssues(validationIssues);
+    if (blockingIssues.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Export blocked by unfinished placeholders",
+          message:
+            "Export is blocked while unfinished placeholders (e.g. [add number]) remain in your CV.",
+          blockingIssues,
+        },
+        { status: 422 }
+      );
+    }
 
     // Generate .docx buffer with regional ordering and labels
     const buffer = await generateDocx(

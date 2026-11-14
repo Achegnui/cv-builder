@@ -8,7 +8,7 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - Project: CV Builder (see MASTER-PLAN.md)
 - Track: antigravity
 - Date of last update: 2026-11-14
-- Current phase: 4
+- Current phase: 5
 - Phase status: done
 
 ### 2. Completed
@@ -17,19 +17,20 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - [x] Phase 2: Template engine and preview
 - [x] Phase 3: PDF and Word export
 - [x] Phase 4: Regions and CV types
-- [ ] Phase 5: CV Doctor and Evidence Vault
+- [x] Phase 5: CV Doctor and Evidence Vault
 - [ ] Phase 6: Honest AI and Coach mode
 - [ ] Phase 7: Job tailoring and gap report
 - [ ] Phase 8: Accounts, payments, privacy
 - [ ] Phase 9: Bilingual, scholarship mode, launch
 
 Notes on what is done inside the current phase:
-- Built complete region profiles architecture in `src/lib/regions/` covering all 8 formats: US, UK, German style (Lebenslauf), Europass-style, academic, technical, combination, and one-page.
-- Kept all regional metadata, default paper sizes, section orders, regional section headings, and warnings in a single editable file (`src/lib/regions/profiles.ts`).
-- Single-column template and `.docx` Word export both dynamically adapt to the active region profile's section order and labels.
-- Added user toggles for photo, date of birth, and nationality, plus expandable "Why?" rationale and dismissible warnings with honest "commonly" / "often" phrasing.
-- Stored selected region profile and overrides in browser localStorage.
-- Added 11 unit tests in `src/tests/regions.test.ts` (46 total tests passing across 7 test suites). Verified with full production Next.js build.
+- Implemented modular CV Doctor validation engine in `src/lib/validation/` with all 8 checks: dates (chronology & future end dates on finished roles), duplicates (organizations/roles), repeated content (summary vs bullets & identical bullets), conflicting claims (inconsistent event rankings e.g. 1st vs 3rd place), label errors (GPA vs degree classification), bullet styles (mixed ending punctuation), placeholders (unfinished placeholders like `[add number]` blocking export), and unverified numbers.
+- Implemented Evidence Vault in `src/lib/vault/` with user-controlled verification toggles, metrics extraction, and browser storage persistence.
+- Built `CVDoctorPanel` with severity indicators, issue filtering, actionable plain-language suggestions, and smooth field jumping.
+- Built `VaultPanel` for adding, viewing, and managing verified facts.
+- Enforced strict export blocking across the UI (`CVForm`, `StyleToolbar`, `PrintPage`) and server API route (`/api/export/docx` returning 422) whenever placeholders remain.
+- Created deliberately broken test CV in `fixtures.ts` that triggers all 8 checks.
+- Added 7 unit tests in `src/tests/validation.test.ts` (53 total passing tests across 8 test suites). Verified with production Next.js build.
 
 ### 3. Decisions (keep each to one line, with the reason)
 | Decision | Reason |
@@ -47,6 +48,9 @@ Notes on what is done inside the current phase:
 | Centralized region catalog in profiles.ts | Keeps all regional conventions, translations, and warnings in one editable data file |
 | Region profile decoupled from template design | Allows any template to adapt dynamically to any region's section order and headings |
 | Honest convention phrasing ("commonly"/"often") | Acknowledges employer variability and avoids dogmatic rules per AGENTS.md rule 10 |
+| Modular validation rules registry | Allows adding or modifying rules without modifying engine or UI code |
+| Export blocked on server and client | Ensures placeholders like `[add number]` can never be exported per AGENTS.md rule 3 |
+| User-only verification flag on vault facts | Prevents automated false assurances; the user actively verifies their evidence |
 
 ### 4. Environment
 - Node version: v22.19.0
@@ -57,13 +61,13 @@ Notes on what is done inside the current phase:
 
 ### 5. Key files (only the important ones)
 ```
-src/lib/regions/types.ts             # Region profile, override, and warning type definitions
-src/lib/regions/profiles.ts          # Catalog of all 8 region profiles and helper functions
-src/components/cv-regions/region-switcher.tsx # Target region dropdown selector with UI disclaimer
-src/components/cv-regions/warnings-panel.tsx  # Expandable regional warnings with 'Why?' and user toggles
-src/lib/templates/single-column.tsx  # Dynamic template rendering with regional ordering & labels
-src/lib/export/docx.ts               # Regional Word export generator
-src/tests/regions.test.ts            # Unit tests for profiles, overrides, ordering, and template integration
+src/lib/validation/engine.ts         # CV Doctor rule runner and severity sorter
+src/lib/validation/rules/            # 8 modular validation check implementations
+src/lib/validation/fixtures.ts       # Deliberately broken sample CV triggering all 8 checks
+src/lib/vault/index.ts               # Evidence Vault storage, fact management, number extraction
+src/components/cv-doctor/cv-doctor-panel.tsx # CV Doctor interactive issue panel with jump links
+src/components/cv-vault/vault-panel.tsx # Evidence Vault management UI with verification toggles
+src/tests/validation.test.ts         # Unit tests for CV Doctor, Evidence Vault, and export blocking
 ```
 
 ### 6. Conventions in use
@@ -71,20 +75,21 @@ src/tests/regions.test.ts            # Unit tests for profiles, overrides, order
 - Strict TypeScript (`noImplicitAny`, strict null checks)
 - Dates stored as `YYYY-MM` strings
 - Components stay small; logic lives in `src/lib`
-- Regional conventions presented honestly with "commonly" or "often" phrasing and user toggles
+- Unfinished placeholders block export completely on client and server
+- Unverified numbers are flagged unless confirmed in Evidence Vault
 - No HTML tables or text boxes for layout
 
 ### 7. Known issues and TODO
-- None from Phase 4.
+- None from Phase 5.
 
 ### 8. Next task (be exact)
-Phase 5: CV Doctor and Evidence Vault. Build validation rules (missing contact info, weak verbs, passive voice, cliché words, date inconsistencies, placeholder text like `[add number]`), and the Evidence Vault for tracking claims and numbers.
+Phase 6: Honest AI and Coach mode. Server-only Claude API routes with strict honesty guards (rejecting output that invents numbers/tools/employers/dates), banned-words filter, em dash avoidance option, and Coach mode that interviews and reviews without ghostwriting.
 
 ### 9. Last session summary
-- Implemented 8 region profiles with dynamic section ordering and regional labels.
-- Added warnings panel with "Why?" explanations and toggles for photo, date of birth, and nationality.
-- Updated SingleColumnTemplate and Word docx export to respect active region profile.
-- Added 11 unit tests (46 total tests passing) and confirmed production build.
+- Implemented CV Doctor with all 8 checks and Evidence Vault with metric extraction.
+- Built CVDoctorPanel and VaultPanel with jump links and verified badges.
+- Enforced placeholder export blocking on client UI and API route (HTTP 422).
+- Added 7 unit tests (53 total passing tests) and verified Next.js production build.
 
 ### 10. Scorecard notes for this track
 - Time spent this phase: ~0.75 hours

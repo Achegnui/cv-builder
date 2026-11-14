@@ -38,6 +38,20 @@ import {
   type RegionProfileId,
   type UserRegionOverrides,
 } from "@/lib/regions";
+import { CVDoctorPanel } from "@/components/cv-doctor/cv-doctor-panel";
+import { VaultPanel } from "@/components/cv-vault/vault-panel";
+import {
+  runCVDoctor,
+  hasBlockingIssues,
+  getBlockingIssues,
+  BROKEN_SAMPLE_CV,
+} from "@/lib/validation";
+import {
+  loadVaultFromStorage,
+  saveVaultToStorage,
+  SAMPLE_VAULT_FACTS,
+  type VaultFact,
+} from "@/lib/vault";
 
 export function CVForm() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -47,6 +61,7 @@ export function CVForm() {
   const [userOverrides, setUserOverrides] = useState<UserRegionOverrides>(() =>
     getDefaultRegionOverrides(getRegionProfile("us"))
   );
+  const [vault, setVault] = useState<VaultFact[]>([]);
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{
     text: string;
@@ -107,6 +122,13 @@ export function CVForm() {
       // Ignore style load errors
     }
 
+    try {
+      const storedVault = loadVaultFromStorage();
+      setVault(storedVault.length > 0 ? storedVault : SAMPLE_VAULT_FACTS);
+    } catch {
+      setVault(SAMPLE_VAULT_FACTS);
+    }
+
     setIsLoaded(true);
   }, [reset]);
 
@@ -158,13 +180,32 @@ export function CVForm() {
     }
   };
 
+  const handleUpdateVault = (updated: VaultFact[]) => {
+    setVault(updated);
+    saveVaultToStorage(updated);
+  };
+
   // Handler: Load fictional sample data
   const handleLoadSample = () => {
     reset(SAMPLE_CV);
     saveCVToStorage(SAMPLE_CV);
+    setVault(SAMPLE_VAULT_FACTS);
+    saveVaultToStorage(SAMPLE_VAULT_FACTS);
     setFeedbackMessage({
       text: "Loaded fictional sample CV. All details are sample data.",
       type: "success",
+    });
+  };
+
+  // Handler: Load deliberately broken test CV for CV Doctor verification
+  const handleLoadBrokenSample = () => {
+    reset(BROKEN_SAMPLE_CV);
+    saveCVToStorage(BROKEN_SAMPLE_CV);
+    setVault([]);
+    saveVaultToStorage([]);
+    setFeedbackMessage({
+      text: "Loaded deliberately broken sample CV to test all 8 CV Doctor checks.",
+      type: "error",
     });
   };
 
@@ -174,6 +215,8 @@ export function CVForm() {
       const empty = getEmptyCVData();
       reset(empty);
       clearCVStorage();
+      setVault([]);
+      saveVaultToStorage([]);
       setFeedbackMessage({
         text: "Cleared all CV data.",
         type: "info",
@@ -223,8 +266,50 @@ export function CVForm() {
     }
   };
 
+    // Sanitize watched data into a stable full object for preview & validation
+  const liveCVData: CVData = {
+    profile: {
+      fullName: watchedData?.profile?.fullName || "",
+      email: watchedData?.profile?.email || "",
+      phone: watchedData?.profile?.phone || "",
+      location: watchedData?.profile?.location || "",
+      linkedIn: watchedData?.profile?.linkedIn || "",
+      website: watchedData?.profile?.website || "",
+      photoUrl: watchedData?.profile?.photoUrl || "",
+      dateOfBirth: watchedData?.profile?.dateOfBirth || "",
+      nationality: watchedData?.profile?.nationality || "",
+    },
+    summary: {
+      text: watchedData?.summary?.text || "",
+    },
+    experience: watchedData?.experience || [],
+    education: watchedData?.education || [],
+    skillGroups: watchedData?.skillGroups || [],
+    projects: watchedData?.projects || [],
+    certifications: watchedData?.certifications || [],
+    awards: watchedData?.awards || [],
+    languages: watchedData?.languages || [],
+    publications: watchedData?.publications || [],
+    grants: watchedData?.grants || [],
+    teaching: watchedData?.teaching || [],
+    conferences: watchedData?.conferences || [],
+  };
+
+  // Run CV Doctor validation rules live
+  const validationIssues = runCVDoctor(liveCVData, { vault });
+  const isExportBlocked = hasBlockingIssues(validationIssues);
+  const blockingIssues = getBlockingIssues(validationIssues);
+
   // Handler: Export Microsoft Word document (.docx)
   const handleExportDocx = async () => {
+    if (isExportBlocked) {
+      setFeedbackMessage({
+        text: `Export blocked: Please resolve ${blockingIssues.length} unfinished placeholder(s) like [add number] before exporting.`,
+        type: "error",
+      });
+      return;
+    }
+
     try {
       setIsExportingDocx(true);
       const response = await fetch("/api/export/docx", {
@@ -270,6 +355,17 @@ export function CVForm() {
     }
   };
 
+  const handlePrint = () => {
+    if (isExportBlocked) {
+      setFeedbackMessage({
+        text: `Export blocked: Please resolve ${blockingIssues.length} unfinished placeholder(s) like [add number] before exporting PDF.`,
+        type: "error",
+      });
+      return;
+    }
+    window.print();
+  };
+
   if (!isLoaded) {
     return (
       <div className="flex items-center justify-center p-12 text-neutral-500">
@@ -277,35 +373,6 @@ export function CVForm() {
       </div>
     );
   }
-
-  // Ensure watchedData has full shape for rendering
-  const liveCVData: CVData = {
-    profile: {
-      fullName: watchedData?.profile?.fullName || "",
-      email: watchedData?.profile?.email || "",
-      phone: watchedData?.profile?.phone || "",
-      location: watchedData?.profile?.location || "",
-      linkedIn: watchedData?.profile?.linkedIn || "",
-      website: watchedData?.profile?.website || "",
-      photoUrl: watchedData?.profile?.photoUrl || "",
-      dateOfBirth: watchedData?.profile?.dateOfBirth || "",
-      nationality: watchedData?.profile?.nationality || "",
-    },
-    summary: {
-      text: watchedData?.summary?.text || "",
-    },
-    experience: watchedData?.experience || [],
-    education: watchedData?.education || [],
-    skillGroups: watchedData?.skillGroups || [],
-    projects: watchedData?.projects || [],
-    certifications: watchedData?.certifications || [],
-    awards: watchedData?.awards || [],
-    languages: watchedData?.languages || [],
-    publications: watchedData?.publications || [],
-    grants: watchedData?.grants || [],
-    teaching: watchedData?.teaching || [],
-    conferences: watchedData?.conferences || [],
-  };
 
   return (
     <FormProvider {...methods}>
@@ -366,6 +433,14 @@ export function CVForm() {
               </button>
               <button
                 type="button"
+                onClick={handleLoadBrokenSample}
+                className="px-3 py-1.5 text-xs sm:text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-colors"
+                title="Loads a sample CV designed to trigger all 8 CV Doctor checks"
+              >
+                Test Broken CV
+              </button>
+              <button
+                type="button"
                 onClick={handleExport}
                 className="px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-md transition-colors"
               >
@@ -374,15 +449,26 @@ export function CVForm() {
               <button
                 type="button"
                 onClick={handleExportDocx}
-                disabled={isExportingDocx}
-                className="px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-800 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 rounded-md transition-colors disabled:opacity-50"
+                disabled={isExportingDocx || isExportBlocked}
+                className="px-3 py-1.5 text-xs sm:text-sm font-medium text-neutral-800 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                title={
+                  isExportBlocked
+                    ? `Export blocked by ${blockingIssues.length} unfinished placeholder(s)`
+                    : "Export Word (.docx)"
+                }
               >
                 {isExportingDocx ? "Generating Word..." : "Export Word"}
               </button>
               <button
                 type="button"
-                onClick={() => window.print()}
-                className="px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+                onClick={handlePrint}
+                disabled={isExportBlocked}
+                className="px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                title={
+                  isExportBlocked
+                    ? `Export blocked by ${blockingIssues.length} unfinished placeholder(s)`
+                    : "Export PDF via browser print"
+                }
               >
                 Export PDF
               </button>
@@ -428,6 +514,10 @@ export function CVForm() {
             </div>
           )}
 
+          {/* Evidence Vault & CV Doctor Panels */}
+          <CVDoctorPanel issues={validationIssues} />
+          <VaultPanel vault={vault} onUpdateVault={handleUpdateVault} />
+
           {/* Form Sections */}
           <form onSubmit={handleSubmit(() => {})} className="space-y-4">
             <ProfileSection />
@@ -466,6 +556,12 @@ export function CVForm() {
             onChange={handleStyleChange}
             onExportDocx={handleExportDocx}
             isExportingDocx={isExportingDocx}
+            isExportBlocked={isExportBlocked}
+            blockingReason={
+              isExportBlocked
+                ? `Export paused: Please resolve ${blockingIssues.length} unfinished placeholder(s) like [add number] before exporting.`
+                : undefined
+            }
           />
           <div className="print-only-container">
             <CVPreview
