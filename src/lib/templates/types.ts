@@ -1,5 +1,6 @@
 import React from "react";
 import type { CVData } from "@/lib/schema";
+import type { RegionProfile, UserRegionOverrides } from "@/lib/regions";
 
 export type PaperSize = "a4" | "letter";
 export type ColorMode = "accent" | "black";
@@ -25,6 +26,8 @@ export const DEFAULT_STYLE_CONFIG: StyleConfig = {
 export interface TemplateProps {
   data: CVData;
   style: StyleConfig;
+  regionProfile?: RegionProfile;
+  userOverrides?: UserRegionOverrides;
 }
 
 export interface Template {

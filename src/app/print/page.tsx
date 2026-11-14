@@ -4,17 +4,50 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { loadCVFromStorage } from "@/lib/storage";
 import { type StyleConfig, DEFAULT_STYLE_CONFIG, templateRegistry } from "@/lib/templates";
+import {
+  getRegionProfile,
+  getDefaultRegionOverrides,
+  type RegionProfile,
+  type RegionProfileId,
+  type UserRegionOverrides,
+} from "@/lib/regions";
 import type { CVData } from "@/lib/schema";
 import { SAMPLE_CV } from "@/lib/schema";
 
 export default function PrintPage() {
   const [data, setData] = useState<CVData | null>(null);
   const [style, setStyle] = useState<StyleConfig>(DEFAULT_STYLE_CONFIG);
+  const [regionProfile, setRegionProfile] = useState<RegionProfile>(() => getRegionProfile("us"));
+  const [overrides, setOverrides] = useState<UserRegionOverrides>(() =>
+    getDefaultRegionOverrides(getRegionProfile("us"))
+  );
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     const saved = loadCVFromStorage();
     setData(saved || SAMPLE_CV);
+
+    let currentProfile = getRegionProfile("us");
+    try {
+      const savedRegionId = localStorage.getItem("cv-builder-region") as RegionProfileId | null;
+      if (savedRegionId) {
+        currentProfile = getRegionProfile(savedRegionId);
+        setRegionProfile(currentProfile);
+      }
+    } catch {
+      // Ignore region load errors
+    }
+
+    try {
+      const savedOverrides = localStorage.getItem("cv-builder-overrides");
+      if (savedOverrides) {
+        setOverrides(JSON.parse(savedOverrides));
+      } else {
+        setOverrides(getDefaultRegionOverrides(currentProfile));
+      }
+    } catch {
+      setOverrides(getDefaultRegionOverrides(currentProfile));
+    }
 
     try {
       const savedStyle = localStorage.getItem("cv-builder-style");
@@ -50,7 +83,9 @@ export default function PrintPage() {
     <div className="min-h-screen bg-white">
       {/* Top Banner (hidden in print) */}
       <div className="no-print bg-neutral-900 text-white p-3 flex items-center justify-between text-xs sm:text-sm">
-        <span>Print View: In the print dialog, select &ldquo;Save as PDF&rdquo; with paper size &ldquo;{style.paperSize.toUpperCase()}&rdquo;.</span>
+        <span>
+          Print View ({regionProfile.name}): In the print dialog, select &ldquo;Save as PDF&rdquo; with paper size &ldquo;{style.paperSize.toUpperCase()}&rdquo;.
+        </span>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -71,7 +106,12 @@ export default function PrintPage() {
       {/* Printable Document Container */}
       <div className="w-full flex justify-center p-0 print:p-0">
         <div className="w-full max-w-[210mm] print:max-w-none print:w-full">
-          <TemplateComponent data={data} style={style} />
+          <TemplateComponent
+            data={data}
+            style={style}
+            regionProfile={regionProfile}
+            userOverrides={overrides}
+          />
         </div>
       </div>
     </div>

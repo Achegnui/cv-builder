@@ -7,8 +7,8 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 ### 1. Snapshot
 - Project: CV Builder (see MASTER-PLAN.md)
 - Track: antigravity
-- Date of last update: 2026-11-11
-- Current phase: 3
+- Date of last update: 2026-11-14
+- Current phase: 4
 - Phase status: done
 
 ### 2. Completed
@@ -16,7 +16,7 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - [x] Phase 1: Data model and form
 - [x] Phase 2: Template engine and preview
 - [x] Phase 3: PDF and Word export
-- [ ] Phase 4: Regions and CV types
+- [x] Phase 4: Regions and CV types
 - [ ] Phase 5: CV Doctor and Evidence Vault
 - [ ] Phase 6: Honest AI and Coach mode
 - [ ] Phase 7: Job tailoring and gap report
@@ -24,11 +24,12 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - [ ] Phase 9: Bilingual, scholarship mode, launch
 
 Notes on what is done inside the current phase:
-- Implemented Microsoft Word export generator in `src/lib/export/docx.ts` using `docx` with right-aligned tab stops for dates, bullet formatting, A4/Letter sizing, and black-only/accent styling.
-- Created server-side API route handler at `POST /api/export/docx` streaming `.docx` binary attachments with sanitized filenames.
-- Built dedicated clean print view at `/print` for zero-cost, high-reliability vector PDF generation via browser print.
-- Added Export buttons for Word (.docx) and PDF across both the preview toolbar and the top form actions bar.
-- Added 7 unit tests in `src/tests/export.test.ts` verifying binary validity, internal OpenXML contents, right tab stops, black-only color enforcement, and API route responses (35 total tests passing).
+- Built complete region profiles architecture in `src/lib/regions/` covering all 8 formats: US, UK, German style (Lebenslauf), Europass-style, academic, technical, combination, and one-page.
+- Kept all regional metadata, default paper sizes, section orders, regional section headings, and warnings in a single editable file (`src/lib/regions/profiles.ts`).
+- Single-column template and `.docx` Word export both dynamically adapt to the active region profile's section order and labels.
+- Added user toggles for photo, date of birth, and nationality, plus expandable "Why?" rationale and dismissible warnings with honest "commonly" / "often" phrasing.
+- Stored selected region profile and overrides in browser localStorage.
+- Added 11 unit tests in `src/tests/regions.test.ts` (46 total tests passing across 7 test suites). Verified with full production Next.js build.
 
 ### 3. Decisions (keep each to one line, with the reason)
 | Decision | Reason |
@@ -43,6 +44,9 @@ Notes on what is done inside the current phase:
 | Black-only mode as first-class setting | Critical for traditional employers, government portals, and ATS scanners |
 | PDF via browser print with /print view | Zero server compute cost ($0), instant 0ms latency, 100% reliable on free hosts |
 | Word export via `docx` library | Produces native, editable OpenXML documents matching the ATS template layout |
+| Centralized region catalog in profiles.ts | Keeps all regional conventions, translations, and warnings in one editable data file |
+| Region profile decoupled from template design | Allows any template to adapt dynamically to any region's section order and headings |
+| Honest convention phrasing ("commonly"/"often") | Acknowledges employer variability and avoids dogmatic rules per AGENTS.md rule 10 |
 
 ### 4. Environment
 - Node version: v22.19.0
@@ -53,11 +57,13 @@ Notes on what is done inside the current phase:
 
 ### 5. Key files (only the important ones)
 ```
-src/lib/export/docx.ts               # Word document generation with tab stops & styling
-src/app/api/export/docx/route.ts     # POST route streaming .docx binary attachment
-src/app/print/page.tsx               # Dedicated clean print-to-PDF view
-src/components/cv-preview/style-toolbar.tsx # Export Word & Export PDF action triggers
-src/tests/export.test.ts             # Word export & API route unit tests
+src/lib/regions/types.ts             # Region profile, override, and warning type definitions
+src/lib/regions/profiles.ts          # Catalog of all 8 region profiles and helper functions
+src/components/cv-regions/region-switcher.tsx # Target region dropdown selector with UI disclaimer
+src/components/cv-regions/warnings-panel.tsx  # Expandable regional warnings with 'Why?' and user toggles
+src/lib/templates/single-column.tsx  # Dynamic template rendering with regional ordering & labels
+src/lib/export/docx.ts               # Regional Word export generator
+src/tests/regions.test.ts            # Unit tests for profiles, overrides, ordering, and template integration
 ```
 
 ### 6. Conventions in use
@@ -65,18 +71,20 @@ src/tests/export.test.ts             # Word export & API route unit tests
 - Strict TypeScript (`noImplicitAny`, strict null checks)
 - Dates stored as `YYYY-MM` strings
 - Components stay small; logic lives in `src/lib`
+- Regional conventions presented honestly with "commonly" or "often" phrasing and user toggles
 - No HTML tables or text boxes for layout
 
 ### 7. Known issues and TODO
-- None from Phase 3.
+- None from Phase 4.
 
 ### 8. Next task (be exact)
-Phase 4: Regions and CV types. Build region profiles in `src/lib/regions` (US, UK, German style Lebenslauf, Europass-style, academic, technical, combination, one-page) with a warnings panel and toggles for photo, date of birth, and length.
+Phase 5: CV Doctor and Evidence Vault. Build validation rules (missing contact info, weak verbs, passive voice, cliché words, date inconsistencies, placeholder text like `[add number]`), and the Evidence Vault for tracking claims and numbers.
 
 ### 9. Last session summary
-- Built `.docx` Word export engine matching the single-column template layout with right-aligned tab stops.
-- Created `POST /api/export/docx` route handler and dedicated `/print` view.
-- Added 7 export unit tests and verified production build.
+- Implemented 8 region profiles with dynamic section ordering and regional labels.
+- Added warnings panel with "Why?" explanations and toggles for photo, date of birth, and nationality.
+- Updated SingleColumnTemplate and Word docx export to respect active region profile.
+- Added 11 unit tests (46 total tests passing) and confirmed production build.
 
 ### 10. Scorecard notes for this track
 - Time spent this phase: ~0.75 hours

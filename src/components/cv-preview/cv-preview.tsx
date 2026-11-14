@@ -3,14 +3,23 @@
 import React from "react";
 import type { CVData } from "@/lib/schema";
 import { type StyleConfig, templateRegistry } from "@/lib/templates";
+import type { RegionProfile, UserRegionOverrides } from "@/lib/regions";
 
 interface CVPreviewProps {
   data: CVData;
   style: StyleConfig;
   templateId?: string;
+  regionProfile?: RegionProfile;
+  userOverrides?: UserRegionOverrides;
 }
 
-export function CVPreview({ data, style, templateId = "single-column" }: CVPreviewProps) {
+export function CVPreview({
+  data,
+  style,
+  templateId = "single-column",
+  regionProfile,
+  userOverrides,
+}: CVPreviewProps) {
   const template = templateRegistry.get(templateId);
   const TemplateComponent = template.component;
 
@@ -27,7 +36,12 @@ export function CVPreview({ data, style, templateId = "single-column" }: CVPrevi
         <div
           className={`${paperClass} bg-white shadow-md print:shadow-none print:w-full print:max-w-none transition-all duration-150`}
         >
-          <TemplateComponent data={data} style={style} />
+          <TemplateComponent
+            data={data}
+            style={style}
+            regionProfile={regionProfile}
+            userOverrides={userOverrides}
+          />
         </div>
       </div>
     </div>

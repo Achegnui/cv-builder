@@ -3,8 +3,8 @@ import { z } from "zod";
 import { CVDataSchema } from "@/lib/schema";
 import { generateDocx } from "@/lib/export/docx";
 import { DEFAULT_STYLE_CONFIG, type StyleConfig } from "@/lib/templates";
+import { getRegionProfile, type RegionProfileId, type UserRegionOverrides } from "@/lib/regions";
 
-// Zod schema for style config in export requests
 const StyleConfigSchema = z.object({
   paperSize: z.enum(["a4", "letter"]).default("a4"),
   colorMode: z.enum(["accent", "black"]).default("accent"),
@@ -13,9 +13,32 @@ const StyleConfigSchema = z.object({
   spacing: z.enum(["normal", "compact"]).default("normal"),
 });
 
+const UserOverridesSchema = z
+  .object({
+    showPhoto: z.boolean().default(false),
+    showDateOfBirth: z.boolean().default(false),
+    showNationality: z.boolean().default(false),
+    dismissedWarningIds: z.array(z.string()).default([]),
+  })
+  .optional();
+
 const ExportRequestSchema = z.object({
   data: CVDataSchema,
   style: StyleConfigSchema.optional().default(DEFAULT_STYLE_CONFIG),
+  regionProfileId: z
+    .enum([
+      "us",
+      "uk",
+      "german",
+      "europass",
+      "academic",
+      "technical",
+      "combination",
+      "one-page",
+    ])
+    .optional()
+    .default("us"),
+  userOverrides: UserOverridesSchema,
 });
 
 export async function POST(request: Request) {
@@ -33,10 +56,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data, style } = parseResult.data;
+    const { data, style, regionProfileId, userOverrides } = parseResult.data;
+    const regionProfile = getRegionProfile(regionProfileId as RegionProfileId);
 
-    // Generate .docx buffer
-    const buffer = await generateDocx(data, style as StyleConfig);
+    // Generate .docx buffer with regional ordering and labels
+    const buffer = await generateDocx(
+      data,
+      style as StyleConfig,
+      regionProfile,
+      userOverrides as UserRegionOverrides | undefined
+    );
 
     // Sanitize user name for download filename
     const safeName = (data.profile.fullName || "CV")
@@ -45,7 +74,6 @@ export async function POST(request: Request) {
       .replace(/_+/g, "_");
     const filename = `${safeName}_CV.docx`;
 
-    // Convert Buffer to Uint8Array for Next.js Response
     const uint8Array = new Uint8Array(buffer);
 
     return new Response(uint8Array, {

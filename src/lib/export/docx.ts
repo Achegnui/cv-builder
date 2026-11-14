@@ -7,15 +7,18 @@ import {
   BorderStyle,
   convertInchesToTwip,
   convertMillimetersToTwip,
-  AlignmentType,
 } from "docx";
 import type { CVData } from "@/lib/schema";
 import type { StyleConfig } from "@/lib/templates";
+import type { RegionProfile, UserRegionOverrides, SectionKey } from "@/lib/regions";
 
 /**
- * Generate a native Microsoft Word (.docx) document buffer from CV data and style configuration.
- * Adheres strictly to the same layout and styling rules as the ATS-safe Single Column template:
- * - Clean semantic hierarchy
+ * Generate a native Microsoft Word (.docx) document buffer from CV data, style config,
+ * and optional region profile conventions.
+ * Mirrors the SingleColumnTemplate layout dynamically:
+ * - Dynamic regional section ordering
+ * - Regional section headings
+ * - Personal detail toggles (DOB, nationality)
  * - Right-aligned tab stops for dates
  * - Consistent bullet points
  * - A4 and US Letter page dimension support
@@ -24,7 +27,9 @@ import type { StyleConfig } from "@/lib/templates";
  */
 export async function generateDocx(
   data: CVData,
-  style: StyleConfig
+  style: StyleConfig,
+  regionProfile?: RegionProfile,
+  userOverrides?: UserRegionOverrides
 ): Promise<Buffer> {
   const isBlackOnly = style.colorMode === "black";
   const isCompact = style.spacing === "compact";
@@ -57,15 +62,14 @@ export async function generateDocx(
     ? convertInchesToTwip(0.6)
     : convertMillimetersToTwip(15);
 
-  // Content width is page width minus left and right margins
   const contentWidth = pageWidth - marginX * 2;
 
   // Font sizes in half-points (e.g. 24 = 12pt, 20 = 10pt, 18 = 9pt)
-  const nameSize = isCompact ? 36 : 42; // 18pt or 21pt
-  const headingSize = isCompact ? 20 : 22; // 10pt or 11pt
-  const titleSize = isCompact ? 19 : 20; // 9.5pt or 10pt
-  const bodySize = isCompact ? 18 : 19; // 9pt or 9.5pt
-  const smallSize = 16; // 8pt
+  const nameSize = isCompact ? 36 : 42;
+  const headingSize = isCompact ? 20 : 22;
+  const titleSize = isCompact ? 19 : 20;
+  const bodySize = isCompact ? 18 : 19;
+  const smallSize = 16;
 
   // Paragraph Spacing in twips
   const sectionHeadingSpacing = isCompact
@@ -77,6 +81,41 @@ export async function generateDocx(
   const bulletSpacing = isCompact
     ? { before: 20, after: 40 }
     : { before: 40, after: 60 };
+
+  // Personal detail toggles
+  const showDob = userOverrides?.showDateOfBirth ?? (regionProfile?.personalDetailsAllowed.dateOfBirth ?? false);
+  const showNat = userOverrides?.showNationality ?? (regionProfile?.personalDetailsAllowed.nationality ?? false);
+
+  // Regional section ordering and labels
+  const sectionOrder: SectionKey[] = regionProfile?.sectionOrder || [
+    "summary",
+    "experience",
+    "education",
+    "skills",
+    "projects",
+    "certifications",
+    "awards",
+    "languages",
+    "publications",
+    "grants",
+    "teaching",
+    "conferences",
+  ];
+
+  const labels = regionProfile?.sectionLabels || {
+    summary: "Summary",
+    experience: "Experience",
+    education: "Education",
+    skills: "Skills",
+    projects: "Projects",
+    certifications: "Certifications",
+    awards: "Honors & Awards",
+    languages: "Languages",
+    publications: "Publications",
+    grants: "Grants & Funding",
+    teaching: "Teaching Experience",
+    conferences: "Conferences & Talks",
+  };
 
   // Helper for section headings with bottom border rule
   const createSectionHeading = (title: string): Paragraph => {
@@ -133,7 +172,7 @@ export async function generateDocx(
     if (rightDate) {
       children.push(
         new TextRun({
-          text: "\t", // Push to right margin tab stop
+          text: "\t",
           font: fontName,
         }),
         new TextRun({
@@ -158,7 +197,6 @@ export async function generateDocx(
     });
   };
 
-  // Build document paragraphs
   const paragraphs: Paragraph[] = [];
 
   // 1. Header (Full Name & Contact details)
@@ -183,8 +221,8 @@ export async function generateDocx(
   if (data.profile.location) contactItems.push(data.profile.location);
   if (data.profile.linkedIn) contactItems.push(data.profile.linkedIn);
   if (data.profile.website) contactItems.push(data.profile.website);
-  if (data.profile.nationality) contactItems.push(`Nationality: ${data.profile.nationality}`);
-  if (data.profile.dateOfBirth) contactItems.push(`Born: ${data.profile.dateOfBirth}`);
+  if (showNat && data.profile.nationality) contactItems.push(`Nationality: ${data.profile.nationality}`);
+  if (showDob && data.profile.dateOfBirth) contactItems.push(`Born: ${data.profile.dateOfBirth}`);
 
   if (contactItems.length > 0) {
     paragraphs.push(
@@ -202,9 +240,10 @@ export async function generateDocx(
     );
   }
 
-  // 2. Summary
-  if (data.summary.text) {
-    paragraphs.push(createSectionHeading("Summary"));
+  // Section generators
+  const buildSummary = () => {
+    if (!data.summary.text) return;
+    paragraphs.push(createSectionHeading(labels.summary));
     paragraphs.push(
       new Paragraph({
         spacing: { before: 40, after: 100 },
@@ -218,11 +257,11 @@ export async function generateDocx(
         ],
       })
     );
-  }
+  };
 
-  // 3. Skills
-  if (data.skillGroups.length > 0) {
-    paragraphs.push(createSectionHeading("Skills"));
+  const buildSkills = () => {
+    if (!data.skillGroups || data.skillGroups.length === 0) return;
+    paragraphs.push(createSectionHeading(labels.skills));
     for (const group of data.skillGroups) {
       const skillsStr = group.skills.filter(Boolean).join(", ");
       paragraphs.push(
@@ -246,11 +285,11 @@ export async function generateDocx(
         })
       );
     }
-  }
+  };
 
-  // 4. Experience
-  if (data.experience.length > 0) {
-    paragraphs.push(createSectionHeading("Experience"));
+  const buildExperience = () => {
+    if (!data.experience || data.experience.length === 0) return;
+    paragraphs.push(createSectionHeading(labels.experience));
     for (const exp of data.experience) {
       const dateRange = `${exp.startDate || ""} – ${exp.isCurrent ? "Present" : exp.endDate || ""}`;
       paragraphs.push(createEntryHeader(exp.title, exp.employer, dateRange));
@@ -288,11 +327,11 @@ export async function generateDocx(
         );
       }
     }
-  }
+  };
 
-  // 5. Education
-  if (data.education.length > 0) {
-    paragraphs.push(createSectionHeading("Education"));
+  const buildEducation = () => {
+    if (!data.education || data.education.length === 0) return;
+    paragraphs.push(createSectionHeading(labels.education));
     for (const edu of data.education) {
       const dateRange = `${edu.startDate || ""} – ${edu.isExpected ? "Expected " : ""}${edu.endDate || ""}`;
       const degreeFull = edu.field ? `${edu.degree} in ${edu.field}` : edu.degree;
@@ -337,11 +376,11 @@ export async function generateDocx(
         }
       }
     }
-  }
+  };
 
-  // 6. Projects
-  if (data.projects.length > 0) {
-    paragraphs.push(createSectionHeading("Projects"));
+  const buildProjects = () => {
+    if (!data.projects || data.projects.length === 0) return;
+    paragraphs.push(createSectionHeading(labels.projects));
     for (const proj of data.projects) {
       const dateRange = proj.startDate || proj.endDate
         ? `${proj.startDate || ""} – ${proj.endDate || ""}`
@@ -381,11 +420,11 @@ export async function generateDocx(
         );
       }
     }
-  }
+  };
 
-  // 7. Certifications
-  if (data.certifications.length > 0) {
-    paragraphs.push(createSectionHeading("Certifications"));
+  const buildCertifications = () => {
+    if (!data.certifications || data.certifications.length === 0) return;
+    paragraphs.push(createSectionHeading(labels.certifications));
     for (const cert of data.certifications) {
       paragraphs.push(
         createEntryHeader(
@@ -395,11 +434,11 @@ export async function generateDocx(
         )
       );
     }
-  }
+  };
 
-  // 8. Awards
-  if (data.awards.length > 0) {
-    paragraphs.push(createSectionHeading("Honors & Awards"));
+  const buildAwards = () => {
+    if (!data.awards || data.awards.length === 0) return;
+    paragraphs.push(createSectionHeading(labels.awards));
     for (const award of data.awards) {
       paragraphs.push(
         createEntryHeader(
@@ -424,11 +463,11 @@ export async function generateDocx(
         );
       }
     }
-  }
+  };
 
-  // 9. Languages
-  if (data.languages.length > 0) {
-    paragraphs.push(createSectionHeading("Languages"));
+  const buildLanguages = () => {
+    if (!data.languages || data.languages.length === 0) return;
+    paragraphs.push(createSectionHeading(labels.languages));
     paragraphs.push(
       new Paragraph({
         spacing: { before: 40, after: 100 },
@@ -444,11 +483,11 @@ export async function generateDocx(
         ],
       })
     );
-  }
+  };
 
-  // 10. Academic Sections (Publications, Grants, Teaching, Conferences)
-  if (data.publications && data.publications.length > 0) {
-    paragraphs.push(createSectionHeading("Publications"));
+  const buildPublications = () => {
+    if (!data.publications || data.publications.length === 0) return;
+    paragraphs.push(createSectionHeading(labels.publications));
     for (const pub of data.publications) {
       const parts = [
         pub.title,
@@ -470,31 +509,55 @@ export async function generateDocx(
         })
       );
     }
-  }
+  };
 
-  if (data.grants && data.grants.length > 0) {
-    paragraphs.push(createSectionHeading("Grants & Funding"));
+  const buildGrants = () => {
+    if (!data.grants || data.grants.length === 0) return;
+    paragraphs.push(createSectionHeading(labels.grants));
     for (const grant of data.grants) {
       const subtitle = `${grant.funder || ""}${grant.amount ? ` (${grant.currency || "$"} ${grant.amount})` : ""}`;
       paragraphs.push(createEntryHeader(grant.title, subtitle || undefined, grant.startDate || undefined));
     }
-  }
+  };
 
-  if (data.teaching && data.teaching.length > 0) {
-    paragraphs.push(createSectionHeading("Teaching Experience"));
+  const buildTeaching = () => {
+    if (!data.teaching || data.teaching.length === 0) return;
+    paragraphs.push(createSectionHeading(labels.teaching));
     for (const t of data.teaching) {
       const dateRange = t.startDate ? `${t.startDate} – ${t.endDate || "Present"}` : undefined;
       const subtitle = `${t.course || ""}${t.institution ? ` (${t.institution})` : ""}`;
       paragraphs.push(createEntryHeader(t.role, subtitle || undefined, dateRange));
     }
-  }
+  };
 
-  if (data.conferences && data.conferences.length > 0) {
-    paragraphs.push(createSectionHeading("Conferences & Talks"));
+  const buildConferences = () => {
+    if (!data.conferences || data.conferences.length === 0) return;
+    paragraphs.push(createSectionHeading(labels.conferences));
     for (const conf of data.conferences) {
       const subtitle = `${conf.event || ""}${conf.role ? ` [${conf.role}]` : ""}`;
       paragraphs.push(createEntryHeader(conf.title, subtitle || undefined, conf.date || undefined));
     }
+  };
+
+  const sectionBuilderMap: Record<SectionKey, () => void> = {
+    summary: buildSummary,
+    experience: buildExperience,
+    education: buildEducation,
+    skills: buildSkills,
+    projects: buildProjects,
+    certifications: buildCertifications,
+    awards: buildAwards,
+    languages: buildLanguages,
+    publications: buildPublications,
+    grants: buildGrants,
+    teaching: buildTeaching,
+    conferences: buildConferences,
+  };
+
+  // Build sections according to regional order
+  for (const sectionKey of sectionOrder) {
+    const builder = sectionBuilderMap[sectionKey];
+    if (builder) builder();
   }
 
   // Create Docx Document

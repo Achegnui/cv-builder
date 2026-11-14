@@ -29,11 +29,24 @@ import { ConferencesSection } from "./conferences-section";
 
 import { StyleToolbar } from "@/components/cv-preview/style-toolbar";
 import { CVPreview } from "@/components/cv-preview/cv-preview";
+import { RegionSwitcher } from "@/components/cv-regions/region-switcher";
+import { WarningsPanel } from "@/components/cv-regions/warnings-panel";
+import {
+  getRegionProfile,
+  getDefaultRegionOverrides,
+  type RegionProfile,
+  type RegionProfileId,
+  type UserRegionOverrides,
+} from "@/lib/regions";
 
 export function CVForm() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
   const [style, setStyle] = useState<StyleConfig>(DEFAULT_STYLE_CONFIG);
+  const [regionProfileId, setRegionProfileId] = useState<RegionProfileId>("us");
+  const [userOverrides, setUserOverrides] = useState<UserRegionOverrides>(() =>
+    getDefaultRegionOverrides(getRegionProfile("us"))
+  );
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{
     text: string;
@@ -52,8 +65,30 @@ export function CVForm() {
   // Watch full CV data for instant live preview updates
   const watchedData = watch();
 
-  // 1. On page open: load saved CV & style from browser storage (if any)
+  // 1. On page open: load saved CV & style & region from browser storage (if any)
   useEffect(() => {
+    let initialProfile = getRegionProfile("us");
+    try {
+      const savedRegionId = localStorage.getItem("cv-builder-region") as RegionProfileId | null;
+      if (savedRegionId) {
+        setRegionProfileId(savedRegionId);
+        initialProfile = getRegionProfile(savedRegionId);
+      }
+    } catch {
+      // Ignore region load errors
+    }
+
+    try {
+      const savedOverrides = localStorage.getItem("cv-builder-overrides");
+      if (savedOverrides) {
+        setUserOverrides(JSON.parse(savedOverrides));
+      } else {
+        setUserOverrides(getDefaultRegionOverrides(initialProfile));
+      }
+    } catch {
+      setUserOverrides(getDefaultRegionOverrides(initialProfile));
+    }
+
     const saved = loadCVFromStorage();
     if (saved) {
       reset(saved);
@@ -92,6 +127,32 @@ export function CVForm() {
     setStyle(updated);
     try {
       localStorage.setItem("cv-builder-style", JSON.stringify(updated));
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  const regionProfile = getRegionProfile(regionProfileId);
+
+  const handleSelectProfile = (profile: RegionProfile) => {
+    setRegionProfileId(profile.id);
+    const defaultOverrides = getDefaultRegionOverrides(profile);
+    setUserOverrides(defaultOverrides);
+    const updatedStyle: StyleConfig = { ...style, paperSize: profile.defaultPaperSize };
+    setStyle(updatedStyle);
+    try {
+      localStorage.setItem("cv-builder-region", profile.id);
+      localStorage.setItem("cv-builder-overrides", JSON.stringify(defaultOverrides));
+      localStorage.setItem("cv-builder-style", JSON.stringify(updatedStyle));
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  const handleUpdateOverrides = (updated: UserRegionOverrides) => {
+    setUserOverrides(updated);
+    try {
+      localStorage.setItem("cv-builder-overrides", JSON.stringify(updated));
     } catch {
       // Ignore storage errors
     }
@@ -169,7 +230,12 @@ export function CVForm() {
       const response = await fetch("/api/export/docx", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: liveCVData, style }),
+        body: JSON.stringify({
+          data: liveCVData,
+          style,
+          regionProfileId,
+          userOverrides,
+        }),
       });
 
       if (!response.ok) {
@@ -268,6 +334,17 @@ export function CVForm() {
           👁️ Live Preview
         </button>
       </div>
+
+      {/* Target Region Switcher & Regional Warnings */}
+      <RegionSwitcher
+        currentProfileId={regionProfileId}
+        onSelectProfile={handleSelectProfile}
+      />
+      <WarningsPanel
+        profile={regionProfile}
+        overrides={userOverrides}
+        onUpdateOverrides={handleUpdateOverrides}
+      />
 
       {/* Main Grid: Single-column on mobile, Side-by-side on desktop */}
       <div className="lg:grid lg:grid-cols-12 lg:gap-8 items-start">
@@ -391,7 +468,12 @@ export function CVForm() {
             isExportingDocx={isExportingDocx}
           />
           <div className="print-only-container">
-            <CVPreview data={liveCVData} style={style} />
+            <CVPreview
+              data={liveCVData}
+              style={style}
+              regionProfile={regionProfile}
+              userOverrides={userOverrides}
+            />
           </div>
         </div>
       </div>
