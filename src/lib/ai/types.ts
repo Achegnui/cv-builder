@@ -15,7 +15,17 @@ export interface HonestyGuardConfig {
 }
 
 export interface GuardViolation {
-  type: "number" | "tool" | "employer" | "date" | "banned_word" | "em_dash";
+  type:
+    | "number"
+    | "tool"
+    | "employer"
+    | "date"
+    | "banned_word"
+    | "em_dash"
+    | "proper_noun"
+    | "title"
+    | "metric_phrase"
+    | "injection";
   term: string;
   details: string;
 }
