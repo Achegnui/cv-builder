@@ -42,6 +42,8 @@ import { CVDoctorPanel } from "@/components/cv-doctor/cv-doctor-panel";
 import { VaultPanel } from "@/components/cv-vault/vault-panel";
 import { AIActionProvider } from "@/components/cv-ai/ai-context";
 import { AIToolbar } from "./ai-toolbar";
+import { TailoringModal } from "@/components/cv-tailoring/tailoring-modal";
+import type { TailoredBulletProposal } from "@/lib/tailoring/types";
 import {
   runCVDoctor,
   hasBlockingIssues,
@@ -64,6 +66,7 @@ export function CVForm() {
     getDefaultRegionOverrides(getRegionProfile("us"))
   );
   const [vault, setVault] = useState<VaultFact[]>([]);
+  const [isTailoringOpen, setIsTailoringOpen] = useState(false);
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{
     text: string;
@@ -185,6 +188,21 @@ export function CVForm() {
   const handleUpdateVault = (updated: VaultFact[]) => {
     setVault(updated);
     saveVaultToStorage(updated);
+  };
+
+  const handleApplyTailoredBullets = (proposals: TailoredBulletProposal[]) => {
+    const currentExp = methods.getValues("experience");
+    const updatedExp = [...currentExp];
+    proposals.forEach((p) => {
+      if (updatedExp[p.entryIndex] && updatedExp[p.entryIndex].bullets) {
+        updatedExp[p.entryIndex].bullets[p.bulletIndex] = p.proposedText;
+      }
+    });
+    methods.setValue("experience", updatedExp, { shouldDirty: true });
+    setFeedbackMessage({
+      text: `Successfully applied ${proposals.length} tailored bullet point(s) to your CV.`,
+      type: "success",
+    });
   };
 
   // Handler: Load fictional sample data
@@ -521,8 +539,17 @@ export function CVForm() {
           <CVDoctorPanel issues={validationIssues} />
           <VaultPanel vault={vault} onUpdateVault={handleUpdateVault} />
 
-          {/* AI Toolbar: Coach Mode & AI Settings */}
-          <AIToolbar />
+          {/* AI Toolbar: Coach Mode, AI Settings, & Job Tailoring */}
+          <AIToolbar onOpenTailoring={() => setIsTailoringOpen(true)} />
+
+          {/* Job Tailoring & Gap Report Modal */}
+          <TailoringModal
+            isOpen={isTailoringOpen}
+            onClose={() => setIsTailoringOpen(false)}
+            cvData={liveCVData}
+            vault={vault}
+            onApplyTailoredBullets={handleApplyTailoredBullets}
+          />
 
           {/* Form Sections */}
           <form onSubmit={handleSubmit(() => {})} className="space-y-4">

@@ -3,7 +3,11 @@
 import React from "react";
 import { useAIAction } from "@/components/cv-ai/ai-context";
 
-export function AIToolbar() {
+interface AIToolbarProps {
+  onOpenTailoring?: () => void;
+}
+
+export function AIToolbar({ onOpenTailoring }: AIToolbarProps) {
   const { openCoach, openSettings, isActionLoading } = useAIAction();
 
   return (
@@ -24,6 +28,18 @@ export function AIToolbar() {
       </div>
 
       <div className="flex items-center gap-2">
+        {onOpenTailoring && (
+          <button
+            type="button"
+            onClick={onOpenTailoring}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-xs transition-colors"
+            title="Tailor your CV to a target job posting with honest gap analysis"
+          >
+            <span>🎯</span>
+            <span>Job Tailoring</span>
+          </button>
+        )}
+
         <button
           type="button"
           onClick={openCoach}

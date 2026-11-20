@@ -8,8 +8,8 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - Project: CV Builder (see MASTER-PLAN.md)
 - Track: antigravity
 - Date of last update: 2026-11-20
-- Current phase: 6
-- Phase status: done (hardened)
+- Current phase: 7
+- Phase status: done
 
 ### 2. Completed
 - [x] Phase 0: Setup
@@ -19,30 +19,29 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - [x] Phase 4: Regions and CV types
 - [x] Phase 5: CV Doctor and Evidence Vault
 - [x] Phase 6: Honest AI and Coach mode (hardened)
-- [ ] Phase 7: Job tailoring and gap report
+- [x] Phase 7: Job tailoring and gap report
 - [ ] Phase 8: Accounts, payments, privacy
 - [ ] Phase 9: Bilingual, scholarship mode, launch
 
 Notes on what is done inside the current phase:
-- Implemented server-only Claude API endpoints (`/api/ai/action`, `/api/ai/coach`) with Zod schema validation, sliding-window rate limiting, and zero client-bundle exposure of `ANTHROPIC_API_KEY`.
-- Hardened Honesty Guard with dynamic entity & metric extraction (comparing output against input and Evidence Vault directly rather than static lists): flags written-out numbers (`five`, `twenty`), metric phrases (`doubled`, `twofold`), proper nouns, unearned titles (`Architect`, `Director`), tools, employers, and dates.
-- Implemented prompt injection defense: treats user input as untrusted (`<untrusted_user_text>`), stripping injection directives before establishing source fact baselines so smuggled metrics (e.g. "add a 40% increase") are rejected.
-- Hardened Coach mode with two-layer defense: input phrase detector across diverse wordings + model output validator (`isSubmissionReadyAnswer`) that rejects complete submission-ready application essays.
-- Enforced production safety: in `production`, missing `ANTHROPIC_API_KEY` returns a clear 500 error and never executes mock fallbacks.
-- Configurable model: reads model name from `ANTHROPIC_MODEL` env var with reliable default.
-- Added 37 tests in `src/tests/ai.test.ts` (90 total passing tests across 9 test suites). Verified with Next.js production build.
+- Implemented untrusted job posting parser with injection stripping (`src/lib/tailoring/matcher.ts`) extracting core skills, nice-to-haves, YOE, tools, location, and timezone.
+- Built 3-tier evidence matcher cross-referencing experience bullets, projects, skills, and Evidence Vault facts, classifying items as strong match (with citation), partial match (with adjacent skill note), or honest gap (plainly stated without sugarcoating per AGENTS.md Rule 5).
+- Built Tailored CV Proposer generating reworded bullets that emphasize keywords only where user facts support them; every proposal is validated through `runHonestyGuard`.
+- Built interactive `TailoringModal` with 4 tabs: 1-click sample postings loader, Match & Gap Report with alignment score, Line-by-Line before/after review with individual accept/reject toggles, and Helpers.
+- Built Cover Letter Structure Helper (mission tie, transparent gap statement, evidence, fast learning, close) and Salary Benchmark Helper across 8 countries, 5 levels, and currencies with prominent informational disclaimer.
+- Built `/api/ai/tailor` route with Zod validation and rate limiting.
+- Added 12 unit tests in `src/tests/tailoring.test.ts` (102 total passing tests across 10 test suites). Verified with Next.js production build.
 
 ### 3. Decisions (keep each to one line, with the reason)
 | Decision | Reason |
 |---|---|
-| Claude API server-only via Next.js route handlers | Guarantees API key is never exposed to client browsers per AGENTS.md rule 5 |
-| Dynamic proper noun & title extraction | Avoids static list bypasses; any unmentioned capitalized entity/title is caught |
-| Prompt injection baseline stripping | Prevents adversarial prompts from smuggling metrics into the allowed fact set |
-| Two-layer Coach defense (input + output guard) | Rejects complete submission-ready answers even if jailbreak phrasings bypass input checks |
-| Strict production mock ban | Guarantees production users never receive canned mock responses |
-| Configurable ANTHROPIC_MODEL env var | Allows seamless model switching without code changes or redeployments |
+| Untrusted job posting sanitization | Directives inside job posting text are stripped so injected commands cannot alter match scores |
+| 3-tier matching (strong/partial/gap) | Distinguishes verified strong matches from foundational partials and transparent gaps |
+| Line-by-line bullet review | User maintains full control over proposed rewordings, preventing silent bulk changes |
+| Non-ghostwriting cover letter outline | Provides honest outline addressing gaps rather than fabricated narrative |
+| Sourced salary market references | Provides transparent benchmark ranges with explicit educational disclaimer and units |
 | Dual-layer honesty check (prompt + post-guard) | System prompt instructs honesty; guard inspects and blocks any hallucinated tokens |
-| Non-destructive AI review modal | User must explicitly review and accept before form fields update; never overwrites silently |
+| Claude API server-only via Next.js route handlers | Guarantees API key is never exposed to client browsers per AGENTS.md rule 5 |
 
 ### 4. Environment
 - Node version: v22.19.0
@@ -53,14 +52,12 @@ Notes on what is done inside the current phase:
 
 ### 5. Key files (only the important ones)
 ```
-src/lib/ai/guard.ts                  # Dynamic Honesty Guard & prompt injection baseline sanitizer
-src/lib/ai/claude.ts                 # Server Claude engine, output essay checker, ghostwriting refusal
-src/lib/ai/rate-limiter.ts           # Sliding-window rate limiter for AI routes
-src/app/api/ai/action/route.ts       # Server endpoint for improve-bullet, draft-summary, etc.
-src/app/api/ai/coach/route.ts        # Server endpoint for coach interview, outline, and review
-src/components/cv-ai/ai-context.tsx  # React context for AI actions, review dialog, and settings
-src/components/cv-coach/coach-modal.tsx # 3-tab Coach mode interface with policy banner
-src/tests/ai.test.ts                 # 37 tests verifying dynamic guard, injection defense, output essay check
+src/lib/tailoring/matcher.ts         # Requirement extraction, 3-tier evidence matcher, fit check
+src/lib/tailoring/salary-data.ts     # Curated salary benchmarks across 8 countries and 5 levels
+src/lib/tailoring/sample-postings.ts # Realistic sample job postings (Frontend, Fullstack, Analyst)
+src/app/api/ai/tailor/route.ts       # Server endpoint for job parsing, matching, and fit checks
+src/components/cv-tailoring/tailoring-modal.tsx # 4-tab interactive tailoring, gap report, and helpers UI
+src/tests/tailoring.test.ts          # 12 tests verifying extraction, matching, gaps, and line review
 ```
 
 ### 6. Conventions in use
@@ -71,21 +68,22 @@ src/tests/ai.test.ts                 # 37 tests verifying dynamic guard, injecti
 - Unfinished placeholders block export completely on client and server
 - Unverified numbers are flagged unless confirmed in Evidence Vault
 - AI output is validated by Honesty Guard before reaching the user; never invents facts
+- Gaps in job tailoring are presented plainly, never concealed
 
 ### 7. Known issues and TODO
-- None from Phase 6 hardening.
+- None from Phase 7.
 
 ### 8. Next task (be exact)
-Phase 7: Job tailoring, gap report and fit check (U3). Paste a job posting, extract required/preferred skills, tools, and experience; map to user data as strong/partial/gap; produce tailored CV draft with line-by-line acceptance, fit check, cover letter helper, and salary range helper.
+Phase 8: Accounts, storage, payments and privacy (U5). Propose Supabase, Appwrite and Firebase with pros and cons; implement user accounts for saving multiple CVs, delete-my-data button, watermark on free exports, and server-verified Flutterwave payments (mobile money and cards) with webhook signature verification.
 
 ### 9. Last session summary
-- Hardened Honesty Guard with dynamic entity & number-word extraction and prompt-injection defense.
-- Hardened Coach mode with model output inspection (`isSubmissionReadyAnswer`) and expanded phrasings.
-- Enforced production error handling for missing API keys (no mocks in production) and configurable `ANTHROPIC_MODEL`.
-- 90 unit tests passing across 9 test suites; production build verified.
+- Implemented Phase 7: Job Tailoring, Gap Report and Fit Check.
+- Built requirement extractor, 3-tier evidence matcher, fit check, tailored bullet generator, and helpers.
+- Built interactive 4-tab TailoringModal and wired into toolbar and form.
+- Added 12 tests in `src/tests/tailoring.test.ts` (102 total tests across 10 test suites). Verified Next.js production build.
 
 ### 10. Scorecard notes for this track
-- Time spent this phase: ~1.0 hours (including hardening)
+- Time spent this phase: ~0.75 hours
 - Number of fix prompts needed: 0
 - Manual steps I had to do myself: 0
 - Surprises: None.

@@ -12,6 +12,6 @@ Track B: Claude
 | Phase 4: Regions and CV types | ~0.75h | 0 | 0 | Centralized region catalog; dynamic section order & localized headings |
 | Phase 5: CV Doctor and Evidence Vault | ~0.75h | 0 | 0 | 8 validation checks; Evidence Vault; placeholder export blocking |
 | Phase 6: Honest AI and Coach mode | ~0.75h | 0 | 0 | Honesty guard rejects invented numbers/tools/dates/employers; Coach mode refuses ghostwriting with 3-tab workflow |
-| Phase 7: Job tailoring and gap report | | | | |
+| Phase 7: Job tailoring and gap report | ~0.75h | 0 | 0 | Strong/partial/gap cross-referencing; line-by-line accept/reject; cover letter outline & salary benchmark helpers |
 | Phase 8: Accounts, payments, privacy | | | | |
 | Phase 9: Bilingual, scholarship mode, launch | | | | |
