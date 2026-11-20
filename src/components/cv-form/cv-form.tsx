@@ -40,6 +40,8 @@ import {
 } from "@/lib/regions";
 import { CVDoctorPanel } from "@/components/cv-doctor/cv-doctor-panel";
 import { VaultPanel } from "@/components/cv-vault/vault-panel";
+import { AIActionProvider } from "@/components/cv-ai/ai-context";
+import { AIToolbar } from "./ai-toolbar";
 import {
   runCVDoctor,
   hasBlockingIssues,
@@ -376,6 +378,7 @@ export function CVForm() {
 
   return (
     <FormProvider {...methods}>
+      <AIActionProvider>
       {/* Mobile Tab Switcher (< 1024px) */}
       <div className="no-print lg:hidden mb-4 flex border border-neutral-300 rounded-lg p-1 bg-neutral-100">
         <button
@@ -518,10 +521,13 @@ export function CVForm() {
           <CVDoctorPanel issues={validationIssues} />
           <VaultPanel vault={vault} onUpdateVault={handleUpdateVault} />
 
+          {/* AI Toolbar: Coach Mode & AI Settings */}
+          <AIToolbar />
+
           {/* Form Sections */}
           <form onSubmit={handleSubmit(() => {})} className="space-y-4">
             <ProfileSection />
-            <SummarySection />
+            <SummarySection vault={vault} />
             <ExperienceSection />
             <EducationSection />
             <SkillsSection />
@@ -573,6 +579,7 @@ export function CVForm() {
           </div>
         </div>
       </div>
+      </AIActionProvider>
     </FormProvider>
   );
 }

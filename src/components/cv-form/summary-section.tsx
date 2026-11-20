@@ -4,16 +4,43 @@ import { useFormContext } from "react-hook-form";
 import type { CVData } from "@/lib/schema";
 import { FieldError } from "./field-error";
 import { SectionWrapper } from "./section-wrapper";
+import { useAIAction } from "@/components/cv-ai/ai-context";
+import type { VaultFact } from "@/lib/vault";
 
-export function SummarySection() {
-  const { register } = useFormContext<CVData>();
+interface SummarySectionProps {
+  vault?: VaultFact[];
+}
+
+export function SummarySection({ vault = [] }: SummarySectionProps) {
+  const { register, setValue, getValues } = useFormContext<CVData>();
+  const ai = useAIAction();
+
+  const handleDraftFromVault = () => {
+    const currentSummary = getValues("summary.text") || "";
+    ai.draftSummary(
+      vault,
+      currentSummary,
+      (summary: string) => setValue("summary.text", summary, { shouldDirty: true }),
+    );
+  };
 
   return (
     <SectionWrapper title="Summary" description="A short professional summary or objective">
       <div>
-        <label htmlFor="summary.text" className="block text-sm font-medium text-neutral-700">
-          Summary
-        </label>
+        <div className="flex items-center justify-between mb-1">
+          <label htmlFor="summary.text" className="block text-sm font-medium text-neutral-700">
+            Summary
+          </label>
+          <button
+            type="button"
+            onClick={handleDraftFromVault}
+            disabled={ai.isActionLoading || vault.length === 0}
+            className="text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            title={vault.length === 0 ? "Add facts to the Evidence Vault first" : "Draft a summary from your verified vault facts"}
+          >
+            ✨ Draft from Vault
+          </button>
+        </div>
         <textarea
           id="summary.text"
           {...register("summary.text")}

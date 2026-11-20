@@ -7,8 +7,8 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 ### 1. Snapshot
 - Project: CV Builder (see MASTER-PLAN.md)
 - Track: antigravity
-- Date of last update: 2026-11-14
-- Current phase: 5
+- Date of last update: 2026-11-20
+- Current phase: 6
 - Phase status: done
 
 ### 2. Completed
@@ -18,39 +18,28 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - [x] Phase 3: PDF and Word export
 - [x] Phase 4: Regions and CV types
 - [x] Phase 5: CV Doctor and Evidence Vault
-- [ ] Phase 6: Honest AI and Coach mode
+- [x] Phase 6: Honest AI and Coach mode
 - [ ] Phase 7: Job tailoring and gap report
 - [ ] Phase 8: Accounts, payments, privacy
 - [ ] Phase 9: Bilingual, scholarship mode, launch
 
 Notes on what is done inside the current phase:
-- Implemented modular CV Doctor validation engine in `src/lib/validation/` with all 8 checks: dates (chronology & future end dates on finished roles), duplicates (organizations/roles), repeated content (summary vs bullets & identical bullets), conflicting claims (inconsistent event rankings e.g. 1st vs 3rd place), label errors (GPA vs degree classification), bullet styles (mixed ending punctuation), placeholders (unfinished placeholders like `[add number]` blocking export), and unverified numbers.
-- Implemented Evidence Vault in `src/lib/vault/` with user-controlled verification toggles, metrics extraction, and browser storage persistence.
-- Built `CVDoctorPanel` with severity indicators, issue filtering, actionable plain-language suggestions, and smooth field jumping.
-- Built `VaultPanel` for adding, viewing, and managing verified facts.
-- Enforced strict export blocking across the UI (`CVForm`, `StyleToolbar`, `PrintPage`) and server API route (`/api/export/docx` returning 422) whenever placeholders remain.
-- Created deliberately broken test CV in `fixtures.ts` that triggers all 8 checks.
-- Added 7 unit tests in `src/tests/validation.test.ts` (53 total passing tests across 8 test suites). Verified with production Next.js build.
+- Implemented server-only Claude API endpoints (`/api/ai/action`, `/api/ai/coach`) with Zod schema validation, sliding-window rate limiting, and zero client-bundle exposure of `ANTHROPIC_API_KEY`.
+- Built the Honesty Guard (`src/lib/ai/guard.ts`) that strictly rejects output containing unverified numbers, invented tech tools, unmentioned employers, dates/years, or user-configurable banned words (`passionate`, `proven track record`, etc.), with support for an em dash avoidance style setting.
+- Built Coach mode (`src/components/cv-coach/coach-modal.tsx`) with an employer AI policy reminder banner, explicit ghostwriting refusal detector (`isGhostwritingRequest`), and 3 active modes: Interview Chat (asks one focused question at a time), Notes & Outline (organizes user's own points), and Draft Reviewer (checks clarity, length, risky claims, unanswered prompts).
+- Integrated AI actions into the form: "✨" improve bullet in `ExperienceSection`, "✨ Draft from Vault" in `SummarySection`, and `AIToolbar` for Coach mode and AI settings.
+- Built `AIReviewModal` showing before-and-after diffs with Guard pass/fail details and accept/reject confirmation buttons.
+- Added 23 new unit tests in `src/tests/ai.test.ts` (76 total passing tests across 9 test suites). Verified with Next.js production build.
 
 ### 3. Decisions (keep each to one line, with the reason)
 | Decision | Reason |
 |---|---|
-| Next.js App Router + TS strict mode | Required stack, modern standard for server routes and metadata |
-| Vitest with path aliases | Fast unit testing for logic with native ESM and `@/*` mapping |
-| Root outputFileTracingRoot in next.config | Prevents Next.js from falsely inferring user parent directory as workspace root |
-| Dates as YYYY-MM regex strings | Standardized, sortable, prevents timezone shifts across regions |
-| GPA & degree classification separated | Prevents mixing US 4.0 GPA with UK honours classifications |
-| Client-side auto-save with Zod validation | Guarantees stored data validity and prevents work loss without server roundtrips |
-| Semantic HTML for templates (no tables) | Ensures ATS parsing accuracy and strict compliance with accessibility standards |
-| Black-only mode as first-class setting | Critical for traditional employers, government portals, and ATS scanners |
-| PDF via browser print with /print view | Zero server compute cost ($0), instant 0ms latency, 100% reliable on free hosts |
-| Word export via `docx` library | Produces native, editable OpenXML documents matching the ATS template layout |
-| Centralized region catalog in profiles.ts | Keeps all regional conventions, translations, and warnings in one editable data file |
-| Region profile decoupled from template design | Allows any template to adapt dynamically to any region's section order and headings |
-| Honest convention phrasing ("commonly"/"often") | Acknowledges employer variability and avoids dogmatic rules per AGENTS.md rule 10 |
-| Modular validation rules registry | Allows adding or modifying rules without modifying engine or UI code |
-| Export blocked on server and client | Ensures placeholders like `[add number]` can never be exported per AGENTS.md rule 3 |
-| User-only verification flag on vault facts | Prevents automated false assurances; the user actively verifies their evidence |
+| Claude API server-only via Next.js route handlers | Guarantees API key is never exposed to client browsers per AGENTS.md rule 5 |
+| Dual-layer honesty check (prompt + post-guard) | System prompt instructs honesty; guard inspects and blocks any hallucinated tokens |
+| Vault number verification reuse | Links Honesty Guard directly to Evidence Vault facts for zero-hallucination metric validation |
+| Ghostwriting refusal with constructive alternative | Fulfills AGENTS.md rule 8; directs users to authentic reflection, outlines, and review |
+| In-memory sliding window rate limiter | Protects Claude API quota from loops and abuse without external Redis dependencies |
+| Non-destructive AI review modal | User must explicitly review and accept before form fields update; never overwrites silently |
 
 ### 4. Environment
 - Node version: v22.19.0
@@ -61,13 +50,14 @@ Notes on what is done inside the current phase:
 
 ### 5. Key files (only the important ones)
 ```
-src/lib/validation/engine.ts         # CV Doctor rule runner and severity sorter
-src/lib/validation/rules/            # 8 modular validation check implementations
-src/lib/validation/fixtures.ts       # Deliberately broken sample CV triggering all 8 checks
-src/lib/vault/index.ts               # Evidence Vault storage, fact management, number extraction
-src/components/cv-doctor/cv-doctor-panel.tsx # CV Doctor interactive issue panel with jump links
-src/components/cv-vault/vault-panel.tsx # Evidence Vault management UI with verification toggles
-src/tests/validation.test.ts         # Unit tests for CV Doctor, Evidence Vault, and export blocking
+src/lib/ai/guard.ts                  # Honesty Guard inspecting numbers, tools, dates, employers, clichés
+src/lib/ai/claude.ts                 # Server Claude engine, system prompts, ghostwriting refusal logic
+src/lib/ai/rate-limiter.ts           # Sliding-window rate limiter for AI routes
+src/app/api/ai/action/route.ts       # Server endpoint for improve-bullet, draft-summary, etc.
+src/app/api/ai/coach/route.ts        # Server endpoint for coach interview, outline, and review
+src/components/cv-ai/ai-context.tsx  # React context for AI actions, review dialog, and settings
+src/components/cv-coach/coach-modal.tsx # 3-tab Coach mode interface with policy banner
+src/tests/ai.test.ts                 # 23 tests verifying Honesty Guard, refusal guard, and rate limiter
 ```
 
 ### 6. Conventions in use
@@ -77,19 +67,19 @@ src/tests/validation.test.ts         # Unit tests for CV Doctor, Evidence Vault,
 - Components stay small; logic lives in `src/lib`
 - Unfinished placeholders block export completely on client and server
 - Unverified numbers are flagged unless confirmed in Evidence Vault
-- No HTML tables or text boxes for layout
+- AI output is validated by Honesty Guard before reaching the user; never invents facts
 
 ### 7. Known issues and TODO
-- None from Phase 5.
+- None from Phase 6.
 
 ### 8. Next task (be exact)
-Phase 6: Honest AI and Coach mode. Server-only Claude API routes with strict honesty guards (rejecting output that invents numbers/tools/employers/dates), banned-words filter, em dash avoidance option, and Coach mode that interviews and reviews without ghostwriting.
+Phase 7: Job tailoring, gap report and fit check (U3). Paste a job posting, extract required/preferred skills, tools, and experience; map to user data as strong/partial/gap; produce tailored CV draft with line-by-line acceptance, fit check, cover letter helper, and salary range helper.
 
 ### 9. Last session summary
-- Implemented CV Doctor with all 8 checks and Evidence Vault with metric extraction.
-- Built CVDoctorPanel and VaultPanel with jump links and verified badges.
-- Enforced placeholder export blocking on client UI and API route (HTTP 422).
-- Added 7 unit tests (53 total passing tests) and verified Next.js production build.
+- Implemented Phase 6: Honest AI and Coach mode.
+- Built Claude API routes, Honesty Guard, rate limiter, Coach modal, AI review modal, and form integrations.
+- Added 23 tests in `src/tests/ai.test.ts` (76 total passing tests across 9 test suites).
+- Built and verified Next.js production build (`npm run build`).
 
 ### 10. Scorecard notes for this track
 - Time spent this phase: ~0.75 hours

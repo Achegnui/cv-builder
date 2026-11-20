@@ -5,6 +5,7 @@ import { useFormContext, useFieldArray } from "react-hook-form";
 import type { CVData } from "@/lib/schema";
 import { FieldError } from "./field-error";
 import { SectionWrapper, EntryControls } from "./section-wrapper";
+import { useAIAction } from "@/components/cv-ai/ai-context";
 
 export function ExperienceSection() {
   const { register, control } = useFormContext<CVData>();
@@ -113,9 +114,22 @@ function BulletList({
   prefix: string;
   register: ReturnType<typeof useFormContext<CVData>>["register"];
 }) {
-  const { control } = useFormContext<CVData>();
+  const { control, setValue, getValues } = useFormContext<CVData>();
+  const ai = useAIAction();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- useFieldArray needs the generic path
   const { fields, append, remove } = useFieldArray({ control, name: `${prefix}.bullets` as any });
+
+  const handleImprove = (bIdx: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic path for nested bullets
+    const bulletPath = `${prefix}.bullets.${bIdx}` as any;
+    const currentText = getValues(bulletPath) as string;
+    if (!currentText?.trim()) return;
+
+    ai.improveBullet(
+      currentText,
+      (improved: string) => setValue(bulletPath, improved, { shouldDirty: true }),
+    );
+  };
 
   return (
     <div>
@@ -128,6 +142,16 @@ function BulletList({
             className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             placeholder="Describe an achievement or responsibility..."
           />
+          <button
+            type="button"
+            onClick={() => handleImprove(bIdx)}
+            disabled={ai.isActionLoading}
+            className="text-blue-500 hover:text-blue-700 text-xs font-medium px-1.5 py-1 rounded hover:bg-blue-50 disabled:opacity-40"
+            aria-label="Improve bullet with AI"
+            title="Improve this bullet with AI (honesty-guarded)"
+          >
+            ✨
+          </button>
           <button type="button" onClick={() => remove(bIdx)} className="text-red-400 hover:text-red-600 text-sm" aria-label="Remove bullet">✕</button>
         </div>
       ))}
