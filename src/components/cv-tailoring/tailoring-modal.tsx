@@ -84,8 +84,8 @@ export function TailoringModal({
       const matchResults = matchRequirements(extracted, cvData, vault);
       setMatches(matchResults);
 
-      // 3. Fit check
-      const fit = generateFitCheck(matchResults);
+      // 3. Fit check factoring in actual vs required experience
+      const fit = generateFitCheck(matchResults, cvData, extracted);
       setFitCheck(fit);
 
       // 4. Tailored bullet proposals
@@ -268,24 +268,52 @@ export function TailoringModal({
           {activeTab === "match" && fitCheck && (
             <div className="space-y-4 text-xs">
               {/* Overall Fit Header */}
-              <div className="p-3.5 bg-neutral-50 border border-neutral-200 rounded-lg flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider block">
-                    Fit Check Assessment
-                  </span>
-                  <h4 className="text-sm font-bold text-neutral-900 mt-0.5">
-                    {posting?.title} {posting?.company ? `at ${posting.company}` : ""}
-                  </h4>
-                  <p className="text-neutral-600 mt-1">{fitCheck.summary}</p>
+              <div className="p-3.5 bg-neutral-50 border border-neutral-200 rounded-lg space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider block">
+                      Fit Check Assessment
+                    </span>
+                    <h4 className="text-sm font-bold text-neutral-900 mt-0.5">
+                      {posting?.title} {posting?.company ? `at ${posting.company}` : ""}
+                    </h4>
+                    <p className="text-neutral-700 mt-1">{fitCheck.summary}</p>
+                  </div>
+                  <div className="text-center p-2.5 px-4 bg-white rounded-md border border-neutral-200 shadow-xs">
+                    <span
+                      className={`block text-sm font-black uppercase tracking-wider ${
+                        fitCheck.fitLabel === "strong fit"
+                          ? "text-green-700"
+                          : fitCheck.fitLabel === "stretch"
+                          ? "text-amber-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {fitCheck.fitLabel === "strong fit"
+                        ? "🟢 Strong Fit"
+                        : fitCheck.fitLabel === "stretch"
+                        ? "🟡 Stretch"
+                        : "🔴 Long Shot"}
+                    </span>
+                    <span className="text-[10px] text-neutral-500 font-semibold uppercase block mt-0.5">
+                      Fit Label
+                    </span>
+                  </div>
                 </div>
-                <div className="text-center p-2.5 px-4 bg-white rounded-md border border-neutral-200 shadow-xs">
-                  <span className="block text-2xl font-black text-blue-600">
-                    {fitCheck.overallFitScore}%
-                  </span>
-                  <span className="text-[10px] text-neutral-500 font-semibold uppercase">
-                    Alignment Score
-                  </span>
-                </div>
+
+                {/* Plain-language reasons factoring in YOE */}
+                {fitCheck.reasons.length > 0 && (
+                  <div className="pt-2 border-t border-neutral-200">
+                    <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-1">
+                      Assessment Factors (Experience & Core Requirements):
+                    </span>
+                    <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-neutral-600">
+                      {fitCheck.reasons.map((reason, idx) => (
+                        <li key={idx}>{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               {/* Match Filter Pills */}
@@ -574,16 +602,51 @@ export function TailoringModal({
                 </div>
 
                 {salaryInfo && (
-                  <div className="p-3 bg-white border border-neutral-200 rounded text-center space-y-1">
-                    <span className="text-[11px] font-semibold text-neutral-500 uppercase">
-                      Estimated Market Range ({salaryInfo.country} &bull; {selectedLevel}):
-                    </span>
-                    <div className="text-lg font-bold text-green-700">
-                      {salaryInfo.formattedRange}
-                    </div>
-                    <p className="text-[10px] text-neutral-400 italic">
-                      Source: {salaryInfo.dataSource} &bull; {salaryInfo.disclaimer}
-                    </p>
+                  <div>
+                    {salaryInfo.available ? (
+                      <div className="p-3 bg-white border border-neutral-200 rounded text-center space-y-1.5">
+                        <span className="text-[11px] font-semibold text-neutral-500 uppercase block">
+                          Estimated Market Range ({salaryInfo.country} &bull; {selectedLevel}):
+                        </span>
+                        <div className="text-lg font-bold text-green-700">
+                          {salaryInfo.formattedRange}
+                        </div>
+                        {salaryInfo.sourceUrl ? (
+                          <div className="pt-1 flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-neutral-600">
+                            <span>Source:</span>
+                            <a
+                              href={salaryInfo.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-semibold text-blue-600 hover:text-blue-800 underline inline-flex items-center gap-0.5"
+                            >
+                              <span>{salaryInfo.sourceName}</span>
+                              <span className="text-[10px]">↗</span>
+                            </a>
+                            {salaryInfo.retrievedDate && (
+                              <span className="text-neutral-400">
+                                &bull; Retrieved on {salaryInfo.retrievedDate}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-neutral-500">Source: {salaryInfo.sourceName}</p>
+                        )}
+                        <p className="text-[10px] text-neutral-400 italic pt-1">
+                          {salaryInfo.disclaimer}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-3.5 bg-amber-50 border border-amber-200 rounded text-center space-y-1">
+                        <span className="text-xs font-bold text-amber-900 block">
+                          ℹ️ No Verified Data for {salaryInfo.country}
+                        </span>
+                        <p className="text-[11px] text-amber-800">
+                          {salaryInfo.noDataReason ||
+                            "No verified public tech compensation survey data is currently available for this region. Figures are omitted rather than guessed per honesty standards."}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

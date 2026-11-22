@@ -7,6 +7,7 @@ import type {
   JobRequirementItem,
   RequirementMatch,
   FitCheckResult,
+  FitLabel,
   TailoredBulletProposal,
   CoverLetterOutline,
 } from "./types";
@@ -14,8 +15,57 @@ import type {
 /**
  * Normalizes text for case-insensitive matching
  */
-function norm(text: string): string {
+export function norm(text: string): string {
   return text.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Bidirectional synonym and spelling variant groups
+ */
+export const SYNONYM_GROUPS: string[][] = [
+  ["next.js", "nextjs", "next js"],
+  ["react", "react.js", "reactjs"],
+  ["node.js", "nodejs", "node js"],
+  ["vue", "vue.js", "vuejs"],
+  ["typescript", "ts"],
+  ["javascript", "js", "ecmascript"],
+  ["tailwind css", "tailwindcss", "tailwind"],
+  ["postgresql", "postgres", "psql"],
+  ["customer onboarding", "client onboarding", "user onboarding"],
+  ["user experience", "ux", "ui/ux", "ux/ui"],
+  ["user interface", "ui", "ui/ux", "ux/ui"],
+  ["ci/cd", "continuous integration", "continuous deployment", "ci cd"],
+  ["aws", "amazon web services"],
+  ["gcp", "google cloud platform", "google cloud"],
+  ["azure", "microsoft azure"],
+  ["golang", "go language", "go lang"],
+  ["kubernetes", "k8s"],
+  ["rest api", "rest apis", "restful api", "restful apis"],
+  ["automated testing", "unit testing", "test automation", "automated tests", "unit tests"],
+  ["responsive design", "mobile responsive", "mobile-first design", "responsive web design"],
+];
+
+/**
+ * Retrieves all synonyms and spelling variants for a given term
+ */
+export function getSynonymsForTerm(term: string): string[] {
+  const tNorm = norm(term);
+  const group = SYNONYM_GROUPS.find((grp) => grp.some((s) => norm(s) === tNorm));
+  return group ? group.map(norm) : [tNorm];
+}
+
+/**
+ * Checks whether target text contains the requirement term or any of its known synonyms
+ * using whole-word/phrase boundaries.
+ */
+export function matchesWithSynonyms(reqText: string, targetText: string): boolean {
+  const reqSynonyms = getSynonymsForTerm(reqText);
+  const targetPadded = ` ${norm(targetText)} `;
+  return reqSynonyms.some((syn) => {
+    const s = norm(syn);
+    if (!s) return false;
+    return targetPadded.includes(` ${s} `);
+  });
 }
 
 /**
@@ -23,12 +73,16 @@ function norm(text: string): string {
  */
 const SKILL_ADJACENCIES: Record<string, string[]> = {
   "next.js": ["react", "typescript", "javascript", "web"],
+  "nextjs": ["react", "typescript", "javascript", "web"],
   "react": ["next.js", "vue", "javascript", "frontend"],
   "typescript": ["javascript", "typed", "node.js"],
   "node.js": ["express", "javascript", "typescript", "backend", "api"],
+  "nodejs": ["express", "javascript", "typescript", "backend", "api"],
   "postgresql": ["sql", "mysql", "database", "relational"],
+  "postgres": ["sql", "mysql", "database", "relational"],
   "docker": ["containers", "devops", "linux", "ci/cd"],
   "kubernetes": ["docker", "containers", "cloud", "aws", "gcp"],
+  "k8s": ["docker", "containers", "cloud", "aws", "gcp"],
   "aws": ["cloud", "gcp", "azure", "devops", "s3", "ec2"],
   "graphql": ["rest", "api", "backend"],
   "tailwind css": ["css", "responsive", "html", "styling"],
@@ -36,6 +90,40 @@ const SKILL_ADJACENCIES: Record<string, string[]> = {
   "tableau": ["powerbi", "sql", "excel", "charts", "visualizations"],
   "python": ["data analysis", "r", "pandas", "scripting"],
 };
+
+/**
+ * Calculates candidate's actual years of experience from experience history
+ */
+export function calculateCandidateExperienceYears(cv: CVData): number {
+  if (!cv.experience || cv.experience.length === 0) return 0;
+
+  let totalMonths = 0;
+  const now = new Date();
+
+  for (const exp of cv.experience) {
+    if (!exp.startDate) continue;
+    const startParts = exp.startDate.split("-").map(Number);
+    const startYear = startParts[0] || now.getFullYear();
+    const startMonth = startParts[1] || 1;
+
+    let endYear: number;
+    let endMonth: number;
+    if (exp.isCurrent || !exp.endDate) {
+      endYear = now.getFullYear();
+      endMonth = now.getMonth() + 1;
+    } else {
+      const endParts = exp.endDate.split("-").map(Number);
+      endYear = endParts[0] || startYear;
+      endMonth = endParts[1] || 12;
+    }
+
+    // Inclusive calendar months (e.g. 2024-06 to 2024-08 is June, July, August: 3 months)
+    const months = Math.max(1, (endYear - startYear) * 12 + (endMonth - startMonth) + 1);
+    totalMonths += months;
+  }
+
+  return Math.round((totalMonths / 12) * 10) / 10;
+}
 
 /**
  * Extracts structured requirements from pasted job posting text.
@@ -95,7 +183,6 @@ export function extractJobRequirements(rawPostingText: string): ExtractedJobPost
   const preferredSkills: string[] = [];
   const toolsAndTechnologies: string[] = [];
 
-  // Common tech keywords to scan
   const KNOWN_TECH = [
     "TypeScript",
     "JavaScript",
@@ -124,24 +211,58 @@ export function extractJobRequirements(rawPostingText: string): ExtractedJobPost
     "Linux",
     "Redux",
     "Redis",
+    "Customer Onboarding",
+    "Client Onboarding",
+    "Golang",
+    "Rust",
+    "Terraform",
+    "Ruby on Rails",
   ];
 
-  for (const tech of KNOWN_TECH) {
-    const techRegex = new RegExp(`\\b${tech.replace(".", "\\.")}\\b`, "i");
-    if (techRegex.test(sanitizedText)) {
-      toolsAndTechnologies.push(tech);
-
-      // Determine if in preferred section
-      const preferredSectionRegex = new RegExp(`(?:preferred|nice-to-have|plus|bonus)[\\s\\S]*?${tech.replace(".", "\\.")}`, "i");
-      if (preferredSectionRegex.test(sanitizedText)) {
-        preferredSkills.push(tech);
-      } else {
-        requiredSkills.push(tech);
+  // 1. Explicit requirements line parsing: "Required: a, b, c" or "Requirements: a, b, c"
+  const reqMatch = sanitizedText.match(
+    /(?:required(?:\s+qualifications|\s+skills)?|requirements|must\s*have):\s*([^\n\r]+)/i
+  );
+  if (reqMatch && reqMatch[1]) {
+    const rawItems = reqMatch[1].split(/[,;•|]/);
+    for (const rawItem of rawItems) {
+      const clean = rawItem.trim().replace(/^[-*•\s]+|[.]+$/g, "");
+      // Skip experience expressions like "1 year experience"
+      if (
+        clean &&
+        !/\d+\s*(?:years?|yrs?)/i.test(clean) &&
+        clean.length >= 2 &&
+        clean.length <= 40
+      ) {
+        requiredSkills.push(clean);
+        toolsAndTechnologies.push(clean);
       }
     }
   }
 
-  // Add default required skills if text had general phrasing
+  // 2. Scan KNOWN_TECH with whole-word synonym mapping
+  for (const tech of KNOWN_TECH) {
+    if (matchesWithSynonyms(tech, sanitizedText)) {
+      if (!toolsAndTechnologies.some((t) => matchesWithSynonyms(t, tech))) {
+        toolsAndTechnologies.push(tech);
+      }
+
+      const preferredSectionRegex = new RegExp(
+        `(?:preferred|nice-to-have|plus|bonus)[\\s\\S]*?${tech.replace(".", "\\.")}`,
+        "i"
+      );
+      if (preferredSectionRegex.test(sanitizedText)) {
+        if (!preferredSkills.some((s) => matchesWithSynonyms(s, tech))) {
+          preferredSkills.push(tech);
+        }
+      } else {
+        if (!requiredSkills.some((s) => matchesWithSynonyms(s, tech))) {
+          requiredSkills.push(tech);
+        }
+      }
+    }
+  }
+
   if (requiredSkills.length === 0) {
     if (/frontend/i.test(sanitizedText)) requiredSkills.push("React", "TypeScript", "Responsive Design");
     if (/backend/i.test(sanitizedText)) requiredSkills.push("Node.js", "SQL Databases", "REST APIs");
@@ -163,7 +284,7 @@ export function extractJobRequirements(rawPostingText: string): ExtractedJobPost
 
 /**
  * Cross-references job requirements against the user's CV data and Evidence Vault facts.
- * Classifies each item as strong match, partial match, or honest gap with explicit evidence.
+ * Incorporates synonym and spelling variant mapping.
  */
 export function matchRequirements(
   posting: ExtractedJobPosting,
@@ -172,35 +293,23 @@ export function matchRequirements(
 ): RequirementMatch[] {
   const matches: RequirementMatch[] = [];
 
-  // Collect user's skills
   const userSkills = cv.skillGroups.flatMap((g) => g.skills);
-  const userSkillsNorm = userSkills.map(norm);
-
-  // Collect user's project descriptions and tools
   const userProjectTerms = cv.projects.flatMap((p) => [
     p.name,
     p.description || "",
     ...(p.techStack || []),
   ]);
-  const userProjectTermsNorm = userProjectTerms.map(norm);
-
-  // Collect user's experience bullets
   const userBullets = cv.experience.flatMap((e) => e.bullets);
-  const userBulletsNorm = userBullets.map(norm);
-
-  // Collect vault facts
   const userVaultTerms = vault.map((v) => `${v.label} ${v.value} ${v.note || ""}`);
-  const userVaultTermsNorm = userVaultTerms.map(norm);
 
-  // All user searchable text
-  const allUserTextNorm = [
-    ...userSkillsNorm,
-    ...userProjectTermsNorm,
-    ...userBulletsNorm,
-    ...userVaultTermsNorm,
+  const allUserText = [
+    ...userSkills,
+    ...userProjectTerms,
+    ...userBullets,
+    ...userVaultTerms,
   ].join(" ");
+  const allUserTextNorm = norm(allUserText);
 
-  // 1. Process Required Skills & Tools
   const allRequirements: JobRequirementItem[] = [
     ...posting.requiredSkills.map((s, idx) => ({
       id: `req-skill-${idx}`,
@@ -216,7 +325,6 @@ export function matchRequirements(
     })),
   ];
 
-  // If minimum experience is stated, add experience requirement
   if (posting.minYearsExperience) {
     allRequirements.push({
       id: "req-experience-years",
@@ -226,69 +334,77 @@ export function matchRequirements(
     });
   }
 
-  // Match each requirement
+  const actualYOE = calculateCandidateExperienceYears(cv);
+
   for (const req of allRequirements) {
     const reqLower = req.text.toLowerCase();
-    const reqNorm = norm(req.text);
 
     // Special check for years of experience
     if (req.category === "experience") {
-      const totalRoles = cv.experience.length;
-      if (totalRoles >= (posting.minYearsExperience || 1)) {
+      const minRequired = posting.minYearsExperience || 1;
+      if (actualYOE >= minRequired) {
         matches.push({
           requirement: req,
           strength: "strong",
-          evidence: `Profile documents ${totalRoles} relevant positions/internships matching experience expectations.`,
+          evidence: `Candidate documents ~${actualYOE} years of experience, meeting the ${minRequired}+ years requested.`,
+          sourceLocation: "Experience Section",
+        });
+      } else if (actualYOE >= minRequired * 0.5) {
+        matches.push({
+          requirement: req,
+          strength: "partial",
+          evidence: `Candidate documents ~${actualYOE} years of experience vs ${minRequired}+ years requested. Highlight project depth to bridge difference.`,
           sourceLocation: "Experience Section",
         });
       } else {
         matches.push({
           requirement: req,
-          strength: "partial",
-          evidence: `Profile documents ${totalRoles} position(s). Consider highlighting substantial project coursework and verified vault metrics to offset formal tenure.`,
+          strength: "gap",
+          evidence: `Candidate documents ~${actualYOE} years of experience, substantially below the ${minRequired}+ years requested.`,
           sourceLocation: "Experience Section",
         });
       }
       continue;
     }
 
-    // Direct Exact Match in Skills, Projects, Experience, or Vault
+    // Direct Match or Synonym Match in Skills
     let directEvidence: string | null = null;
     let sourceLoc: string | undefined;
 
-    // Check Skills
-    const matchedSkill = userSkills.find((s) => norm(s) === reqNorm || norm(s).includes(reqNorm));
+    const matchedSkill = userSkills.find((s) => matchesWithSynonyms(req.text, s));
     if (matchedSkill) {
-      directEvidence = `Directly listed under your Skills section ("${matchedSkill}").`;
+      directEvidence = `Directly matches Skills section: "${matchedSkill}".`;
       sourceLoc = "Skills Section";
     }
 
-    // Check Bullets
+    // Check Bullets with Synonyms
     if (!directEvidence) {
-      const matchedBullet = userBullets.find((b) => norm(b).includes(reqNorm));
+      const matchedBullet = userBullets.find((b) => matchesWithSynonyms(req.text, b));
       if (matchedBullet) {
         directEvidence = `Demonstrated in work experience: "${matchedBullet}"`;
         sourceLoc = "Experience Bullets";
       }
     }
 
-    // Check Projects
+    // Check Projects with Synonyms
     if (!directEvidence) {
       const matchedProj = cv.projects.find(
         (p) =>
-          norm(p.name).includes(reqNorm) ||
-          p.techStack?.some((t) => norm(t).includes(reqNorm)) ||
-          norm(p.description || "").includes(reqNorm)
+          matchesWithSynonyms(req.text, p.name) ||
+          p.techStack?.some((t) => matchesWithSynonyms(req.text, t)) ||
+          matchesWithSynonyms(req.text, p.description || "")
       );
       if (matchedProj) {
-        directEvidence = `Demonstrated in project "${matchedProj.name}" using [${(matchedProj.techStack || []).join(", ")}].`;
+        directEvidence = `Demonstrated in project "${matchedProj.name}" [${(matchedProj.techStack || []).join(", ")}].`;
         sourceLoc = "Projects Section";
       }
     }
 
-    // Check Vault
+    // Check Vault with Synonyms
     if (!directEvidence) {
-      const matchedVault = vault.find((v) => norm(v.label).includes(reqNorm) || norm(v.note || "").includes(reqNorm));
+      const matchedVault = vault.find(
+        (v) => matchesWithSynonyms(req.text, v.label) || matchesWithSynonyms(req.text, v.note || "")
+      );
       if (matchedVault) {
         directEvidence = `Confirmed in Evidence Vault: ${matchedVault.label} (${matchedVault.value} ${matchedVault.unit || ""}).`;
         sourceLoc = "Evidence Vault";
@@ -305,7 +421,7 @@ export function matchRequirements(
       continue;
     }
 
-    // Check Partial / Adjacent Skill
+    // Check Partial / Adjacent Skills
     const adjacencies = SKILL_ADJACENCIES[reqLower] || [];
     const foundAdjacency = adjacencies.find((adj) => allUserTextNorm.includes(adj));
 
@@ -319,7 +435,7 @@ export function matchRequirements(
       continue;
     }
 
-    // Honest Gap: Not found anywhere
+    // Honest Gap
     matches.push({
       requirement: req,
       strength: "gap",
@@ -331,27 +447,75 @@ export function matchRequirements(
 }
 
 /**
- * Produces an honest fit check and plain-language next steps.
- * Never sugarcoats or conceals gaps per AGENTS.md Rule 5.
+ * Produces an honest fit check with plain labels ("strong fit", "stretch", "long shot")
+ * factoring in required vs actual years of experience and core requirement gaps.
  */
-export function generateFitCheck(matches: RequirementMatch[]): FitCheckResult {
-  const strongMatches = matches.filter((m) => m.strength === "strong");
-  const partialMatches = matches.filter((m) => m.strength === "partial");
-  const gapMatches = matches.filter((m) => m.strength === "gap");
+export function generateFitCheck(
+  matches: RequirementMatch[],
+  cv?: CVData,
+  posting?: ExtractedJobPosting
+): FitCheckResult {
+  const actualYOE = cv ? calculateCandidateExperienceYears(cv) : 1;
+  const requiredYOE = posting?.minYearsExperience;
 
-  const total = matches.length || 1;
-  const score = Math.round(((strongMatches.length * 100) + (partialMatches.length * 50)) / total);
+  const requiredMatches = matches.filter((m) => !m.requirement.isPreferred);
+  const strongRequired = requiredMatches.filter((m) => m.strength === "strong").length;
+  const gapRequired = requiredMatches.filter((m) => m.strength === "gap").length;
 
-  const keyStrengths = strongMatches.map((m) => `${m.requirement.text} (${m.sourceLocation || "Documented"})`);
-  const plainGaps = gapMatches.map((m) => m.requirement.text);
+  const keyStrengths = matches
+    .filter((m) => m.strength === "strong")
+    .map((m) => `${m.requirement.text} (${m.sourceLocation || "Documented"})`);
+  const plainGaps = matches
+    .filter((m) => m.strength === "gap")
+    .map((m) => m.requirement.text);
 
-  let summary = "";
-  if (score >= 80) {
-    summary = "Strong Overall Match. You meet the primary core qualifications with confirmed evidence across your experience and skills.";
-  } else if (score >= 50) {
-    summary = "Moderate Match with Transparent Gaps. You have foundational skills for the role but lack specific required tools or formal tenure.";
+  const reasons: string[] = [];
+
+  // 1. Experience factor
+  if (requiredYOE !== undefined) {
+    if (actualYOE >= requiredYOE || (requiredYOE <= 1 && actualYOE >= 0.8)) {
+      reasons.push(
+        `Experience Match: Documented ~${actualYOE} years of experience satisfies the ${requiredYOE}+ years requested.`
+      );
+    } else {
+      reasons.push(
+        `Experience Deficit: Documented ~${actualYOE} years of experience is below the ${requiredYOE}+ years requested.`
+      );
+    }
   } else {
-    summary = "Significant Skill Gaps. The role requires specialized tools or background not yet documented in your profile.";
+    reasons.push(`Experience: Documented ~${actualYOE} years of experience.`);
+  }
+
+  // 2. Skill alignment factor
+  reasons.push(
+    `Skill Alignment: ${strongRequired} of ${requiredMatches.length} core required skills have confirmed evidence.`
+  );
+  if (gapRequired > 0) {
+    reasons.push(`Missing Core Requirements: ${gapRequired} required qualification(s) are completely missing from your profile.`);
+  }
+
+  // Determine plain label
+  let fitLabel: FitLabel = "stretch";
+  let summary = "";
+
+  const isSignificantYOEDeficit =
+    requiredYOE !== undefined &&
+    (actualYOE < requiredYOE * 0.5 || (requiredYOE >= 5 && actualYOE <= 2));
+  const hasSevereSkillGaps = gapRequired >= 3;
+
+  if (isSignificantYOEDeficit || hasSevereSkillGaps) {
+    fitLabel = "long shot";
+    summary = "Long Shot: Significant gaps exist in required experience tenure or critical mandatory tools.";
+  } else if (
+    (requiredYOE === undefined || actualYOE >= requiredYOE || requiredYOE <= 1) &&
+    gapRequired <= 1 &&
+    strongRequired >= Math.max(1, Math.floor(requiredMatches.length * 0.5))
+  ) {
+    fitLabel = "strong fit";
+    summary = "Strong Fit: You meet the primary core qualifications and experience expectations with verified evidence.";
+  } else {
+    fitLabel = "stretch";
+    summary = "Stretch Opportunity: You have good foundational skills, but closing 1–2 specific gaps or bridging tenure is needed.";
   }
 
   const honestNextSteps: string[] = [];
@@ -363,25 +527,23 @@ export function generateFitCheck(matches: RequirementMatch[]): FitCheckResult {
       "In application statements, address these gaps transparently by highlighting fast learning agility and related foundations."
     );
   }
-  if (partialMatches.length > 0) {
-    honestNextSteps.push(
-      `Strengthen bullet points to highlight transferrable skills from: ${partialMatches.map((m) => m.requirement.text).join(", ")}.`
-    );
-  }
 
   return {
-    overallFitScore: score,
+    fitLabel,
+    reasons,
     summary,
     keyStrengths,
     plainGaps,
     honestNextSteps,
+    candidateYearsOfExperience: actualYOE,
+    requiredYearsOfExperience: requiredYOE,
   };
 }
 
 /**
  * Generates tailored bullet rewording proposals.
  * Only emphasizes keywords where the user's facts support them.
- * Every proposed bullet is verified with runHonestyGuard to prevent invented metrics.
+ * Every proposed bullet is verified with runHonestyGuard.
  */
 export function generateTailoredBulletProposals(
   cv: CVData,
@@ -396,34 +558,39 @@ export function generateTailoredBulletProposals(
 
   cv.experience.forEach((entry, expIdx) => {
     entry.bullets.forEach((bullet, bIdx) => {
-      // Find a matching keyword relevant to this bullet
-      const relevantKeyword = strongKeywords.find((kw) => {
-        const kwNorm = norm(kw);
-        return norm(entry.title).includes(kwNorm) || norm(bullet).includes(kwNorm);
-      });
+      // Only emphasize keywords where the candidate's bullet already documents the technology/fact
+      const relevantKeyword = strongKeywords.find((kw) => matchesWithSynonyms(kw, bullet));
 
-      if (relevantKeyword && !bullet.toLowerCase().startsWith(relevantKeyword.toLowerCase())) {
-        // Propose active phrasing emphasizing the verified keyword at the front
-        const proposed = bullet.replace(
-          /^([A-Z][a-z]+ed)\s+/i,
-          `$1 using ${relevantKeyword} to `
-        );
+      if (relevantKeyword) {
+        // Formulate a clean active-voice proposal using only the existing facts in the bullet
+        let proposed = bullet;
+        if (/^built\b/i.test(bullet)) {
+          proposed = bullet.replace(/^built\b/i, "Developed");
+        } else if (/^wrote\b/i.test(bullet)) {
+          proposed = bullet.replace(/^wrote\b/i, "Authored");
+        } else if (/^participated\b/i.test(bullet)) {
+          proposed = bullet.replace(/^participated in\b/i, "Collaborated on");
+        } else if (/^helped\b/i.test(bullet)) {
+          proposed = bullet.replace(/^helped\b/i, "Assisted");
+        } else {
+          proposed = bullet.replace(/^([A-Z][a-z]+ed)\b/i, "Spearheaded");
+        }
 
-        // Run proposed text through Honesty Guard
         const guardCheck = runHonestyGuard(proposed, bullet, vault);
 
-        proposals.push({
-          id: `tailored-exp-${expIdx}-${bIdx}`,
-          entryType: "experience",
-          entryIndex: expIdx,
-          bulletIndex: bIdx,
-          originalText: bullet,
-          proposedText: guardCheck.allowed ? proposed : bullet,
-          keywordEmphasized: relevantKeyword,
-          accepted: false,
-          guardPassed: guardCheck.allowed,
-          guardViolationReason: guardCheck.reason,
-        });
+        if (guardCheck.allowed) {
+          proposals.push({
+            id: `tailored-exp-${expIdx}-${bIdx}`,
+            entryType: "experience",
+            entryIndex: expIdx,
+            bulletIndex: bIdx,
+            originalText: bullet,
+            proposedText: proposed,
+            keywordEmphasized: relevantKeyword,
+            accepted: false,
+            guardPassed: true,
+          });
+        }
       }
     });
   });
@@ -433,7 +600,7 @@ export function generateTailoredBulletProposals(
 
 /**
  * Generates an honest, structured cover letter outline.
- * Follows Coach mode principles: organizes the user's authentic facts without ghostwriting.
+ * Follows Coach mode principles: organizes user's authentic facts without ghostwriting.
  */
 export function generateCoverLetterOutline(
   posting: ExtractedJobPosting,

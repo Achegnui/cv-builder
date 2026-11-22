@@ -75,8 +75,8 @@ export async function POST(request: Request) {
     // 4. Match requirements to user's CV data and Evidence Vault
     const matches = matchRequirements(posting, cvData, vaultFacts);
 
-    // 5. Generate honest fit check & next steps
-    const fitCheck = generateFitCheck(matches);
+    // 5. Generate honest fit check & next steps (factoring in YOE)
+    const fitCheck = generateFitCheck(matches, cvData, posting);
 
     // 6. Generate tailored bullet proposals with Honesty Guard validation
     const tailoredBullets = generateTailoredBulletProposals(cvData, posting, matches, vaultFacts);

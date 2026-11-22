@@ -3,6 +3,8 @@ import type { VaultFact } from "@/lib/vault";
 
 export type MatchStrength = "strong" | "partial" | "gap";
 
+export type FitLabel = "strong fit" | "stretch" | "long shot";
+
 export interface JobRequirementItem {
   id: string;
   category: "skill" | "tool" | "experience" | "education" | "location" | "timezone";
@@ -43,11 +45,14 @@ export interface TailoredBulletProposal {
 }
 
 export interface FitCheckResult {
-  overallFitScore: number; // 0 to 100
+  fitLabel: FitLabel; // "strong fit" | "stretch" | "long shot"
+  reasons: string[]; // Specific factors that determined this label
   summary: string; // Plain-language overall assessment
   keyStrengths: string[];
   plainGaps: string[]; // Explicit honest gaps
   honestNextSteps: string[]; // Recommended short courses, target role adjustments, bridge projects
+  candidateYearsOfExperience: number;
+  requiredYearsOfExperience?: number;
 }
 
 export interface CoverLetterOutline {
@@ -62,12 +67,16 @@ export interface SalaryRangeInfo {
   country: string;
   level: "intern" | "junior" | "mid" | "senior" | "lead";
   currency: string;
-  min: number;
-  max: number;
-  period: "year" | "month";
+  available: boolean;
+  min?: number;
+  max?: number;
+  period?: "year" | "month";
   formattedRange: string;
-  dataSource: string;
+  sourceName: string;
+  sourceUrl?: string;
+  retrievedDate?: string;
   disclaimer: string;
+  noDataReason?: string;
 }
 
 export interface JobTailoringState {
