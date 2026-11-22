@@ -1,6 +1,17 @@
 import type { VaultFact } from "./types";
+import { z } from "zod";
 
 export * from "./types";
+
+export const VaultFactSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  value: z.string(),
+  unit: z.string().optional(),
+  note: z.string().optional(),
+  verified: z.boolean().default(true),
+  createdAt: z.string().default(() => new Date().toISOString()),
+});
 
 export const VAULT_STORAGE_KEY = "cv-builder-vault";
 

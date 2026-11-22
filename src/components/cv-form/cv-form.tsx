@@ -56,6 +56,7 @@ import {
   SAMPLE_VAULT_FACTS,
   type VaultFact,
 } from "@/lib/vault";
+import { AuthNav } from "@/components/auth";
 
 export function CVForm() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -242,6 +243,20 @@ export function CVForm() {
         type: "info",
       });
     }
+  };
+
+  // Handler: Load saved CV version from cloud
+  const handleLoadCloudCV = (cvData: CVData, vaultData?: VaultFact[]) => {
+    reset(cvData);
+    saveCVToStorage(cvData);
+    if (vaultData && vaultData.length > 0) {
+      setVault(vaultData);
+      saveVaultToStorage(vaultData);
+    }
+    setFeedbackMessage({
+      text: "Loaded saved CV version from cloud.",
+      type: "success",
+    });
   };
 
   // Handler: Export JSON backup
@@ -504,13 +519,20 @@ export function CVForm() {
                 />
               </label>
             </div>
-            <button
-              type="button"
-              onClick={handleClear}
-              className="px-3 py-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-800 transition-colors"
-            >
-              Clear All
-            </button>
+            <div className="flex items-center gap-2">
+              <AuthNav
+                currentCVData={liveCVData}
+                currentVault={vault}
+                onLoadCV={handleLoadCloudCV}
+              />
+              <button
+                type="button"
+                onClick={handleClear}
+                className="px-3 py-1.5 text-xs sm:text-sm font-medium text-red-600 hover:text-red-800 transition-colors"
+              >
+                Clear All
+              </button>
+            </div>
           </div>
 
           {/* Feedback / Notification Banner */}
