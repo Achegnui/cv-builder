@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/auth-context";
+import { EUConsentBanner } from "@/components/privacy";
+import { Footer } from "@/components/layout/footer";
 
 export const metadata: Metadata = {
   title: "CV Builder",
@@ -20,7 +22,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased min-h-screen flex flex-col">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <div className="flex-1 flex flex-col">{children}</div>
+          <Footer />
+          <EUConsentBanner />
+        </AuthProvider>
       </body>
     </html>
   );

@@ -8,7 +8,7 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - Project: CV Builder (see MASTER-PLAN.md)
 - Track: antigravity
 - Date of last update: 2026-11-24
-- Current phase: 8b
+- Current phase: 8c (Phase 8 complete)
 - Phase status: done
 
 ### 2. Completed
@@ -22,21 +22,24 @@ This file is the memory of the project. Any new chat (or agent) reads it and con
 - [x] Phase 7: Job tailoring, gap report, plain fit labels, synonym matching, and sourced salary benchmarks
 - [x] Phase 8a: Accounts and storage (Supabase, multi-version CVs, RLS isolation, delete all data)
 - [x] Phase 8b: Payments (Flutterwave, watermarks, webhook verification, idempotency, receipts)
+- [x] Phase 8c: Privacy, EU consent notice, Terms of Service draft, zero-log verification
 - [ ] Phase 9: Bilingual, scholarship mode, launch
 
 Notes on what is done inside the current phase:
-- Integrated Flutterwave in test mode supporting cards and Mobile Money (Cameroon MTN/Orange, international).
-- Checkout sessions are initiated strictly on the server (`/api/payments/checkout`) with rate limiting and payload validation.
-- Implemented dual-layer payment verification: `verif-hash` signature check on webhooks and independent server-side lookup via Flutterwave verification API.
-- Implemented idempotent fulfillment in `fulfillTransaction` to prevent double-crediting on retried or replayed webhooks.
-- Free exports enforce a visible watermark: DOCX export (`/api/export/docx`) adds header/footer banners; Print route (`/print`) renders overlay watermark unless a verified paid pass exists.
-- Supports both consumable single-export credits and lifetime passes with upfront price transparency (USD, XAF, EUR, GBP) and zero recurring subscriptions.
-- Official digital receipts issued and viewable via `ReceiptsModal`.
-- Added 12 unit tests in `src/tests/payments.test.ts` covering forged webhooks, replay idempotency, watermark enforcement, and zero CV logging. All 129 tests passing across 12 test suites.
+- Published `/privacy` policy in plain language: specifies stored vs. never-collected data (no government IDs, no card numbers), on-demand Claude API usage, zero model training, retention policies, and cascade account deletion.
+- Published `/terms` of service draft: educational disclaimer (no employment guarantees), honest anti-fraud use policy, 100% user IP ownership, one-time payment terms, and refund policy.
+- Built accessible `EUConsentBanner` informing users of strictly necessary local storage with `localStorage` persistence (`cv_builder_cookie_consent`).
+- Built global `Footer` linking to builder, privacy policy, and terms of service across all pages.
+- Highlighted explicit legal review badges (`[LEGAL REVIEW NEEDED]` and `[FLUTTERWAVE COMPLIANCE NOTE]`) for GDPR cross-border transfers, EU statutory withdrawal waivers, and Flutterwave merchant requirements.
+- Sanitized server export route logs and created automated canary audit suite in `src/tests/privacy-audit.test.ts` (7 tests) proving zero CV content or AI inputs are logged across all server endpoints. All 136 tests passing across 13 test suites.
 
 ### 3. Decisions (keep each to one line, with the reason)
 | Decision | Reason |
 |---|---|
+| Plain-language legal pages | Accessible for students and applicants without dense legal jargon |
+| Essential storage notice (no ad tracking) | Complies with EU ePrivacy/GDPR while affirming zero advertising or cross-site tracking |
+| Explicit compliance flags in legal pages | Highlights specific clauses requiring formal counsel and Flutterwave merchant sign-off |
+| Canary leak tests in test suite | Proves mathematically and empirically that server logs contain zero user CV text or AI inputs |
 | Server-initiated checkout | Guarantees price, currency, and plan cannot be manipulated on the client |
 | Dual webhook verification | Signature check plus live Flutterwave API lookup prevents forged webhook attacks |
 | Idempotent fulfillment | Checking transaction status and timestamp prevents replayed webhooks from granting duplicate passes |
@@ -44,11 +47,7 @@ Notes on what is done inside the current phase:
 | One-time passes, no auto-renewal | Honest monetization model without unexpected trial conversions or hidden recurring charges |
 | Supabase for backend storage | PostgreSQL Row Level Security (RLS) guarantees database-engine level isolation of user CV data |
 | Free builder without login | Users can create, edit, validate, and export locally; saving multiple cloud versions is the account benefit |
-| 404 for unauthorized CV access | Returning 404 instead of 403 prevents User B from detecting the existence of User A's CV IDs |
 | Cascading delete for account removal | `ON DELETE CASCADE` guarantees complete removal of all CV versions and vault facts when account is deleted |
-| Untrusted job posting sanitization | Directives inside job posting text are stripped so injected commands cannot alter match scores |
-| Dual-layer honesty check (prompt + post-guard) | System prompt instructs honesty; guard inspects and blocks any hallucinated tokens |
-| Claude API server-only via Next.js route handlers | Guarantees API key is never exposed to client browsers per AGENTS.md rule 5 |
 
 ### 4. Environment
 - Node version: v22.19.0
@@ -59,19 +58,14 @@ Notes on what is done inside the current phase:
 
 ### 5. Key files (only the important ones)
 ```
-src/lib/payments/types.ts            # Payment models: plans, currencies, transactions, receipts, entitlements
-src/lib/payments/pricing.ts          # Transparent pricing table across USD, XAF, EUR, GBP
-src/lib/payments/flutterwave.ts      # Server-side checkout creation, webhook signature, and transaction verification
-src/lib/payments/store.ts            # Entitlements and idempotent fulfillment store
-src/lib/payments/rate-limiter.ts     # Rate limiter and payload size validation
-src/app/api/payments/checkout/       # Server checkout initiation endpoint
-src/app/api/payments/webhook/        # Webhook handler with signature verification and idempotent processing
-src/app/api/payments/entitlement/    # Server entitlement query endpoint
-src/app/api/payments/receipts/       # User receipts query endpoint
-src/components/payments/             # PricingModal and ReceiptsModal UI
-src/lib/export/docx.ts               # DOCX export with server-injected watermark support
-src/app/print/page.tsx               # Print view with server-verified clean badge or watermark overlay
-src/tests/payments.test.ts           # 12 unit tests for payments, webhooks, idempotency, and watermarks
+src/app/privacy/page.tsx             # Plain-language Privacy Policy page with legal & payment flags
+src/app/terms/page.tsx               # Plain-language Terms of Service draft with merchant requirements
+src/components/privacy/              # EUConsentBanner for essential browser storage consent
+src/components/layout/footer.tsx     # Global site footer with legal navigation links
+src/tests/privacy-audit.test.ts      # 7 automated tests auditing server logs for zero CV/AI input leaks
+src/lib/payments/                    # Flutterwave integration, rate limiting, pricing matrix, store
+src/app/api/payments/                # Server checkout, webhook verification, entitlement, receipts
+src/lib/supabase/                    # Multi-tenant storage with Row Level Security policies
 ```
 
 ### 6. Conventions in use
@@ -88,22 +82,20 @@ src/tests/payments.test.ts           # 12 unit tests for payments, webhooks, ide
 - Zero CV content in server logs or payment payloads
 
 ### 7. Known issues and TODO
-- None from Phase 8b.
+- None from Phase 8.
 
 ### 8. Next task (be exact)
-Phase 9: Bilingual (EN/FR), scholarship mode, mobile polish, and launch checklist. Add full French localization, scholarship-specific CV format/guidance, final 360px mobile audit, and deployment preparation.
+Phase 9: Bilingual (EN/FR), scholarship mode, mobile polish, and launch checklist. Add full French localization, French CV profile notes in region warnings, scholarship-specific CV format/guidance, Coach mode for statements of purpose (outline & review only, no ghostwriting), final 360px mobile audit, and deployment preparation.
 
 ### 9. Last session summary
-- Implemented Phase 8b: Payments, watermarks, webhook verification, and receipts.
-- Server-side checkout initiation with Flutterwave test mode (cards and mobile money).
-- Secure webhook processing with constant-time signature verification (`verif-hash`) and Flutterwave API verification.
-- Idempotency guarantees preventing duplicate fulfillment on retried webhooks.
-- Watermark enforcement on DOCX export (`/api/export/docx`) and Print view (`/print`) for unpaid exports.
-- Transparent upfront pricing (single export and lifetime pass) across USD, XAF, EUR, GBP with zero auto-renewal.
-- Official receipt generation and viewing modal.
-- Added 12 unit tests in `src/tests/payments.test.ts` (129 total tests passing across 12 test suites) and verified Next.js production build.
+- Implemented Phase 8c: Privacy page, EU consent notice, Terms of Service draft, and zero-log verification.
+- Built `/privacy` page detailing stored data vs. never-collected data, on-demand AI only, zero model training, retention, and cascade account deletion.
+- Built `/terms` page draft detailing educational scope (no employment guarantee), honest use anti-fraud policy, 100% user IP ownership, and one-time payment rules.
+- Built `EUConsentBanner` and global `Footer` components.
+- Sanitized export error handling and added `src/tests/privacy-audit.test.ts` (7 tests) proving zero logging of CV content or AI inputs across all server endpoints.
+- All 136 tests passing across 13 test suites; verified Next.js production build with 22 static and dynamic routes.
 
 ### 10. Scorecard notes for this track
-- Time spent this phase: ~0.85 hours
+- Time spent this phase: ~0.75 hours
 - Number of fix prompts needed: 0
 - Manual steps I had to do myself: 0

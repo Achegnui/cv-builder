@@ -143,8 +143,8 @@ export async function POST(request: Request) {
       },
     });
   } catch (error: unknown) {
-    console.error("Failed to generate DOCX export:", error);
     const message = error instanceof Error ? error.message : "Failed to generate document";
+    console.error("DOCX export generation failed:", message);
     return NextResponse.json(
       { error: "Export generation failed", message },
       { status: 500 }
