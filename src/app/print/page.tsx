@@ -24,8 +24,22 @@ export default function PrintPage() {
   );
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasPlaceholders, setHasPlaceholders] = useState(false);
+  const [hasCleanAccess, setHasCleanAccess] = useState(false);
 
   useEffect(() => {
+    // 1. Check server-side entitlement
+    fetch("/api/payments/entitlement")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => {
+        if (payload?.hasCleanExportAccess) {
+          setHasCleanAccess(true);
+        }
+      })
+      .catch(() => {
+        // Unauthenticated or network error -> defaults to free watermarked edition
+        setHasCleanAccess(false);
+      });
+
     const saved = loadCVFromStorage();
     const cvData = saved || SAMPLE_CV;
     setData(cvData);
@@ -98,9 +112,20 @@ export default function PrintPage() {
               ⚠️ Export blocked: CV contains unfinished placeholders (e.g. [add number]). Resolve them before printing.
             </span>
           ) : (
-            <span>
-              Print View ({regionProfile.name}): In print dialog, select &ldquo;Save as PDF&rdquo; with paper size &ldquo;{style.paperSize.toUpperCase()}&rdquo;.
-            </span>
+            <div className="flex items-center gap-2">
+              <span>
+                Print View ({regionProfile.name}): In print dialog, select &ldquo;Save as PDF&rdquo; with paper size &ldquo;{style.paperSize.toUpperCase()}&rdquo;.
+              </span>
+              {hasCleanAccess ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-800 text-emerald-200 text-[11px] font-semibold rounded">
+                  ✨ Clean Export Active
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-800 text-amber-200 text-[11px] font-semibold rounded">
+                  Free Edition (Watermarked)
+                </span>
+              )}
+            </div>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -123,7 +148,7 @@ export default function PrintPage() {
       </div>
 
       {/* Printable Document Container */}
-      <div className="w-full flex justify-center p-0 print:p-0">
+      <div className="w-full flex flex-col items-center justify-center p-0 print:p-0">
         <div className="w-full max-w-[210mm] print:max-w-none print:w-full">
           <TemplateComponent
             data={data}
@@ -131,6 +156,13 @@ export default function PrintPage() {
             regionProfile={regionProfile}
             userOverrides={overrides}
           />
+
+          {/* Watermark for free edition exports */}
+          {!hasCleanAccess && (
+            <div className="text-center text-[10px] text-neutral-400 mt-8 pt-2 border-t border-neutral-200 font-sans italic">
+              Built with CV Builder (Free Edition) • Upgrade to remove watermark
+            </div>
+          )}
         </div>
       </div>
     </div>

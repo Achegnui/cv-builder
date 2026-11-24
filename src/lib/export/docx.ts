@@ -5,6 +5,8 @@ import {
   TextRun,
   TabStopType,
   BorderStyle,
+  Footer,
+  AlignmentType,
   convertInchesToTwip,
   convertMillimetersToTwip,
 } from "docx";
@@ -24,13 +26,16 @@ import type { RegionProfile, UserRegionOverrides, SectionKey } from "@/lib/regio
  * - A4 and US Letter page dimension support
  * - Black-only mode or accent colors
  * - Three safe font stacks (Arial, Georgia, Courier New)
+ * - Server-enforced watermark on free edition exports
  */
 export async function generateDocx(
   data: CVData,
   style: StyleConfig,
   regionProfile?: RegionProfile,
-  userOverrides?: UserRegionOverrides
+  userOverrides?: UserRegionOverrides,
+  options?: { hasWatermark?: boolean }
 ): Promise<Buffer> {
+  const hasWatermark = options?.hasWatermark ?? false;
   const isBlackOnly = style.colorMode === "black";
   const isCompact = style.spacing === "compact";
 
@@ -560,6 +565,24 @@ export async function generateDocx(
     if (builder) builder();
   }
 
+  // Prepend watermark notice to paragraphs for free tier
+  if (hasWatermark) {
+    paragraphs.unshift(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 140 },
+        children: [
+          new TextRun({
+            text: "— Built with CV Builder (Free Edition) • Upgrade to remove watermark —",
+            italics: true,
+            size: 16,
+            color: "777777",
+          }),
+        ],
+      })
+    );
+  }
+
   // Create Docx Document
   const doc = new Document({
     styles: {
@@ -587,6 +610,25 @@ export async function generateDocx(
             },
           },
         },
+        footers: hasWatermark
+          ? {
+              default: new Footer({
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    children: [
+                      new TextRun({
+                        text: "Built with CV Builder (Free Edition) • Upgrade to remove watermark",
+                        italics: true,
+                        size: 15,
+                        color: "888888",
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            }
+          : undefined,
         children: paragraphs,
       },
     ],
